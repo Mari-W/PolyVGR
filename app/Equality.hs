@@ -1,23 +1,30 @@
 module Equality where
 
-import Ast (Dom (DEmpty, DProj, DTree), Kind (KDom, KLam, KSession, KShape, KState, KType), Label (LLeft, LRight), Session (SBranch, SChoice, SDual, SEnd, SRecv, SSend), Shape (SDisjoint, SEmpty, SSingle), Type)
+import Ast (Dom (DEmpty, DProj, DTree, DVar), Kind (KDom, KLam, KSession, KShape, KState, KType), Label (LLeft, LRight), Session (SBranch, SChoice, SDual, SEnd, SRecv, SSend, SVar), Shape (SDisjoint, SEmpty, SSingle), Type)
 import Result (Result, ok, raise)
 
-domNF :: Dom -> Dom
-domNF DEmpty = DEmpty
+domNF :: Dom -> Result Dom
+domNF DEmpty = ok DEmpty
 domNF (DProj l (DTree d d')) = case l of
   LLeft -> domNF d
   LRight -> domNF d'
-domNF (DTree d d') = DTree (domNF d) (domNF d')
-domNF _ = error "unreachable"
+domNF (DTree d d') = do
+  d <- domNF d
+  d' <- domNF d'
+  ok (DTree d d')
+domNF _ = raise "invalid projection to domain"
 
 domEq :: Dom -> Dom -> Result ()
-domEq d d' = case (domNF d, domNF d') of
-  (DEmpty, DEmpty) -> ok ()
-  (DTree d1 d1', DTree d2 d2') -> do
-    domEq d1 d2 
-    domEq d1' d2'
-  _ -> raise "dom mismatch"
+domEq d d' = do
+  d <- domNF d
+  d' <- domNF d'
+  case (d, d') of
+    (DVar i, DVar j) -> if i == j then ok () else raise "dom var mismatch"
+    (DEmpty, DEmpty) -> ok ()
+    (DTree d1 d1', DTree d2 d2') -> do
+      domEq d1 d2 
+      domEq d1' d2'
+    _ -> raise "dom mismatch"
 
 shapeEq :: Shape -> Shape -> Result ()
 shapeEq SEmpty SEmpty = ok ()
@@ -39,6 +46,7 @@ kindEq (KLam k1 k1') (KLam k2 k2') = do
 kindEq _ _ = raise "kind mismatch"
 
 sessNF :: Session -> Session
+sessNF (SDual (SDual (SVar i))) = SVar i
 sessNF (SDual SEnd) = SEnd
 sessNF (SDual (SSend sh st t s)) = SRecv sh st t (sessNF (SDual s))
 sessNF (SDual (SRecv sh st t s)) = SSend sh st t (sessNF (SDual s))

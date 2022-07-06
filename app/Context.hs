@@ -1,13 +1,11 @@
 module Context where
 
-import Ast (Dom, ExprType, Kind (KDom, KLam, KSession, KState, KType))
-
-type Const = (Dom, Dom) 
+import Ast (Dom, ExprType, Kind (KDom, KLam, KSession, KState, KType), Type, Constr)
 
 data Has
-  = HasType ExprType
+  = HasType Type
   | HasKind Kind
-  | HasConst Const
+  | HasConstr Constr
 
 type Ctx = [Has]
 

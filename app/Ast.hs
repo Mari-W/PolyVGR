@@ -26,16 +26,20 @@ data Type
   | TDom Dom
   | TState State
 
+type Constr = (Dom, Dom) 
+
 data ExprType
-  = TForAll Kind Config ExprType
-  | TArr (State, ExprType) (State, ExprType)
-  | TChan Dom
-  | TAccess Session
-  | TUnit
-  | TPair ExprType ExprType
+  = ETVar Int
+  | ETForAll Kind [Constr] ExprType
+  | ETArr (State, ExprType) (State, ExprType)
+  | ETChan Dom
+  | ETAccess Session
+  | ETUnit
+  | ETPair ExprType ExprType
 
 data Session
-  = SSend Shape State ExprType Session
+  = SVar Int
+  | SSend Shape State ExprType Session
   | SRecv Shape State ExprType Session
   | SChoice Session Session
   | SBranch Session Session
@@ -43,7 +47,8 @@ data Session
   | SDual Session
 
 data Dom
-  = DEmpty  
+  = DVar Int
+  | DEmpty  
   | DTree Dom Dom
   | DProj Label Dom
 
@@ -51,5 +56,3 @@ data State
   = SSEmpty
   | SSMap Dom Session
   | SSTree State State
-
-data Config

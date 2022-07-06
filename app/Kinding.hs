@@ -1,9 +1,11 @@
 module Kinding where
 
-import Ast (Dom (DEmpty, DProj, DTree), ExprType (TAccess, TArr, TChan, TForAll, TPair, TUnit), Kind (KDom, KLam, KSession, KShape, KState, KType), Label (LLeft, LRight), Session (SBranch, SChoice, SDual, SEnd, SRecv, SSend), Shape (SDisjoint, SEmpty, SSingle), State (SSEmpty, SSMap, SSTree), Type (TApp, TDom, TExpr, TLam, TSess, TState, TVar))
-import Context (Ctx, Has (HasKind), typeAbsSafe)
+import Ast (Dom (DEmpty, DProj, DTree, DVar), ExprType (ETAccess, ETArr, ETChan, ETForAll, ETPair, ETUnit, ETVar), Kind (KDom, KLam, KSession, KShape, KState, KType), Label (LLeft, LRight), Session (SBranch, SChoice, SDual, SEnd, SRecv, SSend, SVar), Shape (SDisjoint, SEmpty, SSingle), State (SSEmpty, SSMap, SSTree), Type (TApp, TDom, TExpr, TLam, TSess, TState, TVar))
+import Constraints (constrWellFormed, constrWellFormed')
+import Context (Ctx, Has (HasKind, HasType, HasConstr), typeAbsSafe)
 import Equality (kindEq)
 import Result (Result, ok, raise, todo)
+
 
 typeWellFormed :: Ctx -> Type -> Result Kind
 {- K-Var -}
@@ -15,8 +17,8 @@ typeWellFormed ctx (TApp t t') = do
   k <- typeWellFormed ctx t
   k' <- typeWellFormed ctx t'
   case k of
-    KLam f t -> do 
-      kindEq f k' 
+    KLam f t -> do
+      kindEq f k'
       ok t
     _ -> raise "[K-App] expected abstraction to apply to"
 {- K-Lam -}
@@ -39,27 +41,40 @@ typeWellFormed ctx (TState s) = do
   s <- typeStateWellFormed ctx s
   ok KState
 
+typeVarWellFormed :: Ctx -> Int -> Result Kind
+typeVarWellFormed ctx i = typeWellFormed ctx (TVar i)
+
 typeExprWellFormed :: Ctx -> ExprType -> Result ()
+{- K-Var -}
+typeExprWellFormed ctx (ETVar i) = do
+  k <- typeVarWellFormed ctx i
+  kindEq k KType 
 {- K-All -}
-typeExprWellFormed ctx (TForAll k c t) = todo {- disjointness -}
+typeExprWellFormed ctx (ETForAll k c t) = do
+  let ctx' = HasKind k : (map HasConstr c ++ ctx)
+  typeExprWellFormed ctx' t
 {- K-Arr -}
-typeExprWellFormed ctx (TArr (s, e) (s', e')) = todo {- disjointness -}
+typeExprWellFormed ctx (ETArr (s, e) (s', e')) = todo {- disjointness -}
 {- K-Chan -}
-typeExprWellFormed ctx (TChan d) = do
+typeExprWellFormed ctx (ETChan d) = do
   sh <- typeDomWellFormed ctx d
   case sh of
     SSingle -> ok ()
     _ -> raise "[K-Chan] expected shape of single channel for domain"
 {- K-AccessPoint -}
-typeExprWellFormed ctx (TAccess a) = typeSessWellFormed ctx a
+typeExprWellFormed ctx (ETAccess a) = typeSessWellFormed ctx a
 {- K-Unit -}
-typeExprWellFormed ctx TUnit = ok ()
+typeExprWellFormed ctx ETUnit = ok ()
 {- K-Pair -}
-typeExprWellFormed ctx (TPair e e') = do
+typeExprWellFormed ctx (ETPair e e') = do
   typeExprWellFormed ctx e
   typeExprWellFormed ctx e'
 
 typeSessWellFormed :: Ctx -> Session -> Result ()
+{- K-Var -}
+typeSessWellFormed ctx (SVar i) = do
+  k <- typeVarWellFormed ctx i
+  kindEq k KSession
 {- K-Send -}
 typeSessWellFormed ctx (SSend sh st e s) = do
   typeSessWellFormed ctx s
@@ -86,6 +101,11 @@ typeSessWellFormed ctx SEnd = ok ()
 typeSessWellFormed ctx (SDual s) = typeSessWellFormed ctx s
 
 typeDomWellFormed :: Ctx -> Dom -> Result Shape
+{- K-Var -}
+typeDomWellFormed ctx (DVar i) = do
+  k <- typeVarWellFormed ctx i
+  kindEq k (KDom SSingle)
+  ok SSingle
 {- K-DomEmpty -}
 typeDomWellFormed ctx DEmpty = ok SEmpty
 {- K-DomProj -}
@@ -100,7 +120,7 @@ typeDomWellFormed ctx (DProj l d) = do
 typeDomWellFormed ctx (DTree d d') = do
   sh <- typeDomWellFormed ctx d
   sh' <- typeDomWellFormed ctx d'
-  todo {- check disjointness -}
+  constrWellFormed ctx (d, d')
   ok (SDisjoint sh sh')
 
 typeStateWellFormed :: Ctx -> State -> Result ()
@@ -110,12 +130,12 @@ typeStateWellFormed ctx SSEmpty = ok ()
 typeStateWellFormed ctx (SSMap d s) = do
   typeSessWellFormed ctx s
   sh <- typeDomWellFormed ctx d
-  case sh of 
+  case sh of
     SSingle -> ok ()
     _ -> raise "[K-StChan] expected domain of single channel when mapping channel to session type"
 {- K-StMerge -}
 typeStateWellFormed ctx (SSTree st st') = do
   typeStateWellFormed ctx st
   typeStateWellFormed ctx st
-  todo {- check disjointness -}
+  constrWellFormed' ctx (st, st')
   ok ()
