@@ -17,37 +17,39 @@ data Shape
   | SSingle
   | SDisjoint Shape Shape
 
+data Type 
+  = TVar Int
+  | TApp Type Type
+  | TLam Shape Type
+  | TExpr ExprType
+  | TSess Session
+  | TDom Dom
+  | TState State
+
 data ExprType
   = TForAll Kind Config ExprType
-  | TLam ((SessState, ExprType) -> (SessState, ExprType))
+  | TArr (State, ExprType) (State, ExprType)
   | TChan Dom
-  | TAccess SessType
+  | TAccess Session
   | TUnit
-  | TTup ExprType ExprType
+  | TPair ExprType ExprType
 
-data SessType
-  = SSend
-  | SRecv
-  | SChoice SessType SessType
-  | SBranch SessType SessType
-  | End
-  | Dual SessType
+data Session
+  = SSend Shape State ExprType Session
+  | SRecv Shape State ExprType Session
+  | SChoice Session Session
+  | SBranch Session Session
+  | SEnd
+  | SDual Session
 
 data Dom
-  = DEmpty
-  | DTree Shape Shape
+  = DEmpty  
+  | DTree Dom Dom
   | DProj Label Dom
 
-data SessState
+data State
   = SSEmpty
-  | SSMap Dom SessType
-  | SSTree SessState SessState
+  | SSMap Dom Session
+  | SSTree State State
 
 data Config
-
-data Has
-  = HasType ExprType
-  | HasKind Kind
-  | HasDisCon Dom Dom
-
-type Ctx = [Has]

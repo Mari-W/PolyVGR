@@ -7,3 +7,6 @@ raise = Left
 
 ok :: r -> Result r
 ok = Right
+
+todo :: Result r
+todo = raise "unimplemented" 
