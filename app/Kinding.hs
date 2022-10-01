@@ -1,141 +1,182 @@
 module Kinding where
 
-import Ast (Dom (DEmpty, DProj, DTree, DVar), ExprType (ETAccess, ETArr, ETChan, ETForAll, ETPair, ETUnit, ETVar), Kind (KDom, KLam, KSession, KShape, KState, KType), Label (LLeft, LRight), Session (SBranch, SChoice, SDual, SEnd, SRecv, SSend, SVar), Shape (SDisjoint, SEmpty, SSingle), State (SSEmpty, SSMap, SSTree), Type (TApp, TDom, TExpr, TLam, TSess, TState, TVar))
-import Constraints (constrWellFormed, constrWellFormed')
-import Context (Ctx, Has (HasKind, HasType, HasConstr), typeAbsSafe)
-import Equality (kindEq)
-import Result (Result, ok, raise, todo)
+import Ast
+import Context
+import Equality
+import Result
 
-
-typeWellFormed :: Ctx -> Type -> Result Kind
-{- K-Var -}
-typeWellFormed ctx (TVar i) = case ctx !! i of
-  HasKind k -> ok k
-  _ -> raise "[K-Var] expected variable i to have a kind"
-{- K-App -}
-typeWellFormed ctx (TApp t t') = do
-  k <- typeWellFormed ctx t
-  k' <- typeWellFormed ctx t'
-  case k of
-    KLam f t -> do
-      kindEq f k'
-      ok t
-    _ -> raise "[K-App] expected abstraction to apply to"
-{- K-Lam -}
-typeWellFormed ctx (TLam s t) = do
-  k <- typeWellFormed (HasKind (KDom s) : typeAbsSafe ctx) t
-  case kindEq k KType of
-    Left str -> raise str
-    Right _ -> kindEq k KState
-  ok (KLam (KDom s) k)
-typeWellFormed ctx (TExpr e) = do
-  typeExprWellFormed ctx e
-  ok KType
-typeWellFormed ctx (TSess s) = do
-  typeSessWellFormed ctx s
-  ok KSession
-typeWellFormed ctx (TDom d) = do
-  s <- typeDomWellFormed ctx d
-  ok (KDom s)
-typeWellFormed ctx (TState s) = do
-  s <- typeStateWellFormed ctx s
-  ok KState
-
-typeVarWellFormed :: Ctx -> Int -> Result Kind
-typeVarWellFormed ctx i = typeWellFormed ctx (TVar i)
-
-typeExprWellFormed :: Ctx -> ExprType -> Result ()
-{- K-Var -}
-typeExprWellFormed ctx (ETVar i) = do
-  k <- typeVarWellFormed ctx i
-  kindEq k KType 
-{- K-All -}
-typeExprWellFormed ctx (ETForAll k c t) = do
-  let ctx' = HasKind k : (map HasConstr c ++ ctx)
-  typeExprWellFormed ctx' t
-{- K-Arr -}
-typeExprWellFormed ctx (ETArr (s, e) (s', e')) = todo {- disjointness -}
-{- K-Chan -}
-typeExprWellFormed ctx (ETChan d) = do
-  sh <- typeDomWellFormed ctx d
-  case sh of
-    SSingle -> ok ()
-    _ -> raise "[K-Chan] expected shape of single channel for domain"
-{- K-AccessPoint -}
-typeExprWellFormed ctx (ETAccess a) = typeSessWellFormed ctx a
-{- K-Unit -}
-typeExprWellFormed ctx ETUnit = ok ()
-{- K-Pair -}
-typeExprWellFormed ctx (ETPair e e') = do
-  typeExprWellFormed ctx e
-  typeExprWellFormed ctx e'
-
-typeSessWellFormed :: Ctx -> Session -> Result ()
-{- K-Var -}
-typeSessWellFormed ctx (SVar i) = do
-  k <- typeVarWellFormed ctx i
-  kindEq k KSession
-{- K-Send -}
-typeSessWellFormed ctx (SSend sh st e s) = do
-  typeSessWellFormed ctx s
-  let ctx = HasKind (KDom sh) : typeAbsSafe ctx
-  typeStateWellFormed ctx st
-  typeExprWellFormed ctx e
-{- K-Recv -}
-typeSessWellFormed ctx (SRecv sh st e s) = do
-  typeSessWellFormed ctx s
-  let ctx' = HasKind (KDom sh) : typeAbsSafe ctx
-  typeStateWellFormed ctx' st
-  typeExprWellFormed ctx' e
-{- K-Branch -}
-typeSessWellFormed ctx (SBranch s s') = do
-  typeSessWellFormed ctx s
-  typeSessWellFormed ctx s'
-{- K-Choice -}
-typeSessWellFormed ctx (SChoice s s') = do
-  typeSessWellFormed ctx s
-  typeSessWellFormed ctx s'
-{- K-End -}
-typeSessWellFormed ctx SEnd = ok ()
-{- K-Dual -}
-typeSessWellFormed ctx (SDual s) = typeSessWellFormed ctx s
-
-typeDomWellFormed :: Ctx -> Dom -> Result Shape
-{- K-Var -}
-typeDomWellFormed ctx (DVar i) = do
-  k <- typeVarWellFormed ctx i
-  kindEq k (KDom SSingle)
-  ok SSingle
-{- K-DomEmpty -}
-typeDomWellFormed ctx DEmpty = ok SEmpty
-{- K-DomProj -}
-typeDomWellFormed ctx (DProj l d) = do
-  s <- typeDomWellFormed ctx d
-  case s of
-    SDisjoint sh sh' -> case l of
-      LLeft -> ok sh
-      LRight -> ok sh'
-    _ -> raise "[K-DomProj] expected tree like shape when projecting out domain"
-{- K-DomMerge -}
-typeDomWellFormed ctx (DTree d d') = do
-  sh <- typeDomWellFormed ctx d
-  sh' <- typeDomWellFormed ctx d'
-  constrWellFormed ctx (d, d')
-  ok (SDisjoint sh sh')
-
-typeStateWellFormed :: Ctx -> State -> Result ()
-{- K-StEmpty -}
-typeStateWellFormed ctx SSEmpty = ok ()
-{- K-StChan -}
-typeStateWellFormed ctx (SSMap d s) = do
-  typeSessWellFormed ctx s
-  sh <- typeDomWellFormed ctx d
-  case sh of
-    SSingle -> ok ()
-    _ -> raise "[K-StChan] expected domain of single channel when mapping channel to session type"
-{- K-StMerge -}
-typeStateWellFormed ctx (SSTree st st') = do
-  typeStateWellFormed ctx st
-  typeStateWellFormed ctx st
-  constrWellFormed' ctx (st, st')
+kf :: Ctx -> Kind -> Result ()
+kf ctx KType = ok ()
+kf ctx KSession = ok ()
+kf ctx KState = ok ()
+kf ctx KShape = ok ()
+kf ctx (KDom t) = do
+  k <- kind ctx t
+  kEq ctx k KShape
+kf ctx (KLam k k') = do
+  kf ctx k
+  kf ctx k'
   ok ()
+
+kind :: Ctx -> Type -> Result Kind
+{- K-Var -}
+kind ctx (TVar s) = s *? ctx
+{- K-App -}
+kind ctx (TApp f a) = do
+  f' <- kind ctx f
+  a' <- kind ctx a
+  case f' of
+    KLam d c -> do
+      kEq ctx d a'
+      ok c
+    _ -> raise ("[K-App] expected type level abstraction to apply to, got " ++ show f')
+{- K-Lam -}
+kind ctx (TLam s d t) = do
+  kd <- kind ctx d
+  case kd of
+    KDom sh -> do
+      sh' <- kind ctx sh
+      kEq ctx sh' KShape
+      ctx' <- (s, sh') +* gd ctx
+      k <- kind ctx' t
+      kEqs ctx' k [KType, KState]
+      ok (KLam kd k)
+    _ -> raise ("[K-Lam] can only abstract over domains, got " ++ show d)
+{- K-All -}
+kind ctx (EAll s k cs t) = todo
+{- K-Arr -}
+kind ctx (EArr s1 t1 s2 t2) = todo
+{- K-Chan -}
+kind ctx (EChan d) = do
+  d' <- kind ctx d
+  case d' of
+    KDom SHSingle -> ok KType
+    _ -> raise ("[K-Chan] expected single domain, got " ++ show d')
+{- K-AccessPoint -}
+kind ctx (EAcc s) = do
+  s' <- kind ctx s
+  kEq ctx s' KSession
+  ok KType
+{- K-Unit -}
+kind ctx EUnit = ok KType
+{- K-Pair -}
+kind ctx (EPair l r) = do
+  l' <- kind ctx l
+  r' <- kind ctx r
+  kEq ctx l' KType
+  kEq ctx r' KType
+  ok KType
+{- K-Send -}
+kind ctx (SSend s d ss t cont) = do
+  cont' <- kind ctx cont
+  kEq ctx cont' KSession
+  d' <- kind ctx d
+  case d' of
+    KDom sh -> do
+      sh' <- kind ctx sh
+      kEq ctx sh' KShape
+      ctx' <- (s, sh') +* gd ctx
+      ss' <- kind ctx' ss
+      kEq ctx' ss' KState
+      t' <- kind ctx' t
+      kEq ctx' t' KType
+      ok KSession
+    _ -> raise ("[K-Recv] can only abstract over domains, got " ++ show d)
+{- K-Recv -}
+kind ctx (SRecv s d ss t cont) = do
+  cont' <- kind ctx cont
+  kEq ctx cont' KSession
+  d' <- kind ctx d
+  case d' of
+    KDom sh -> do
+      sh' <- kind ctx sh
+      kEq ctx sh' KShape
+      ctx' <- (s, sh') +* gd ctx
+      ss' <- kind ctx' ss
+      kEq ctx' ss' KState
+      t' <- kind ctx' t
+      kEq ctx' t' KType
+      ok KSession
+    _ -> raise ("[K-Recv] can only abstract over domains, got " ++ show d)
+{- K-Branch -}
+kind ctx (SBranch s1 s2) = do
+  s1' <- kind ctx s1
+  kEq ctx s1' KSession
+  s2' <- kind ctx s2
+  kEq ctx s2' KSession
+  ok KSession
+{- K-Choice -}
+kind ctx (SChoice s1 s2) = do
+  s1' <- kind ctx s1
+  kEq ctx s1' KSession
+  s2' <- kind ctx s2
+  kEq ctx s2' KSession
+  ok KSession
+{- K-End -}
+kind ctx SEnd = ok KSession
+{- K-Dual -}
+kind ctx (SDual s) = do
+  s' <- kind ctx s
+  kEq ctx s' KSession
+  ok KSession
+{- K-ShapeEmpty -}
+kind ctx SHEmpty = ok KShape
+{- K-ShapeChan -}
+kind ctx SHSingle = ok KShape
+{- K-ShapePair -}
+kind ctx (SHDisjoint sh1 sh2) = do
+  sh1' <- kind ctx sh1
+  kEq ctx sh1' KShape
+  sh2' <- kind ctx sh2
+  kEq ctx sh2' KShape
+  ok KShape
+{- K-EmptyDom -}
+kind ctx DEmpty = ok (KDom SHEmpty)
+{- K-DomMerge -}
+kind ctx (DMerge d1 d2) = do
+  d1' <- kind ctx d1
+  case d1' of
+    KDom sh1 -> do
+      sh1' <- kind ctx sh1
+      kEq ctx sh1' KShape
+      d2' <- kind ctx d2
+      case d2' of
+        KDom sh2 -> do
+          sh2' <- kind ctx sh2
+          kEq ctx sh2' KShape
+          ok (KDom (SHDisjoint sh1 sh2))
+        _ -> raise ("[K-DomMerge] expected to merge domains, got " ++ show d2)
+    _ -> raise ("[K-DomMerge] expected to merge domains, got " ++ show d1)
+{- K-DomProj -}
+{- !! check disjointness -}
+kind ctx (DProj l d) = do
+  d' <- kind ctx d
+  case d' of
+    KDom (SHDisjoint sh1 sh2) -> do
+      sh1' <- kind ctx sh1
+      kEq ctx sh1' KShape
+      sh2' <- kind ctx sh2
+      kEq ctx sh2' KShape
+      case l of
+        LLeft -> ok (KDom sh1)
+        LRight -> ok (KDom sh2)
+    _ -> raise ("[K-DomProj] expected merged domain, got " ++ show d)
+{- K-StEmpty -}
+kind ctx SSEmpty = ok KState
+{- K-StChan -}
+kind ctx (SSBind d s) = do
+  s' <- kind ctx s
+  kEq ctx s' KSession
+  d' <- kind ctx d
+  case d' of
+    KDom SHSingle -> do
+      ok KState
+    _ -> raise ("[K-StChan] expected single domain, got " ++ show d)
+{- K-StMerge -}
+{- !! check disjointness -}
+kind ctx (SSMerge ss1 ss2) = do
+  ss1' <- kind ctx ss1
+  kEq ctx ss1' KState
+  ss2' <- kind ctx ss2
+  kEq ctx ss2' KState
+  ok KState

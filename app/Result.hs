@@ -10,7 +10,3 @@ ok = Right
 
 todo :: Result r
 todo = raise "unimplemented" 
-
-asBool :: Result r -> Bool
-asBool (Left _) = False
-asBool (Right _) = True

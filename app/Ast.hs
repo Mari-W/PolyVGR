@@ -1,58 +1,72 @@
 module Ast where
-
+  
 data Kind
   = KType
   | KSession
   | KState
   | KShape
-  | KDom Shape
+  | KDom Type
   | KLam Kind Kind
+  deriving (Show, Eq)
+
+data Type
+  = TVar String
+  | TApp Type Type
+  | TLam String Type Type
+  | EAll String Kind [Constr] Type
+  | EArr Type Type Type Type
+  | EChan Type
+  | EAcc Type
+  | EUnit
+  | EPair Type Type
+  | SSend String Type Type Type Type
+  | SRecv String Type Type Type Type
+  | SChoice Type Type
+  | SBranch Type Type
+  | SEnd
+  | SDual Type
+  | SHEmpty
+  | SHSingle
+  | SHDisjoint Type Type
+  | DEmpty
+  | DMerge Type Type
+  | DProj Label Type
+  | SSEmpty
+  | SSBind Type Type
+  | SSMerge Type Type
+  deriving (Show, Eq)
+
+data Expr 
+  = Var String
+  | Let String Expr Expr
+  | App Expr Expr
+  | Abs Type String Type Expr
+  | TAbs String Kind [Constr] Expr
+  | Pair Expr Expr
+  | Proj Label Expr
+  | AApp Expr Type
+  | Fork Expr
+  | Acc Expr
+  | Req Expr
+  | Send Expr
+  | Recv Expr
+  | Sel Label Expr
+  | Case Expr Expr Expr
+  | Close Expr
+  | New Type
+  | Unit
+
+data Val 
+  = VVar String
+  | VChan String
+  | VAbs Type String Type Expr
+  | VTAvs String Kind [Constr] Val
+  | VUnit
+  | VPair Val Val
 
 data Label
   = LLeft
   | LRight
+  deriving (Show, Eq)
 
-data Shape
-  = SEmpty
-  | SSingle
-  | SDisjoint Shape Shape
-
-data Type 
-  = TVar Int
-  | TApp Type Type
-  | TLam Shape Type
-  | TExpr ExprType
-  | TSess Session
-  | TDom Dom
-  | TState State
-
-type Constr = (Dom, Dom) 
-
-data ExprType
-  = ETVar Int
-  | ETForAll Kind [Constr] ExprType
-  | ETArr (State, ExprType) (State, ExprType)
-  | ETChan Dom
-  | ETAccess Session
-  | ETUnit
-  | ETPair ExprType ExprType
-
-data Session
-  = SVar Int
-  | SSend Shape State ExprType Session
-  | SRecv Shape State ExprType Session
-  | SChoice Session Session
-  | SBranch Session Session
-  | SEnd
-  | SDual Session
-
-data Dom
-  = DVar Int
-  | DEmpty  
-  | DTree Dom Dom
-  | DProj Label Dom
-
-data State
-  = SSEmpty
-  | SSMap Dom Session
-  | SSTree State State
+type Constr = (Type, Type)
