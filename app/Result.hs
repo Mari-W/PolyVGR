@@ -10,3 +10,6 @@ ok = Right
 
 todo :: Result r
 todo = raise "unimplemented" 
+
+unreachable :: Result r
+unreachable = raise "unreachable"

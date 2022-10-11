@@ -1,53 +1,61 @@
 module Context where
 
 import Ast
-  ( Constr,
+  ( Constr, Has (HasConstr, HasKind, HasType),
     Kind (KDom, KLam, KSession, KShape, KState, KType),
-    Type,
+    Type (DMerge, TVar), Ctx
   )
 import Data.Foldable (find)
 import Result ( ok, raise, Result )
-
-data Has
-  = HasType Type
-  | HasKind Kind
-  | HasConstr Constr
-
-type Ctx = [(String, Has)]
+import Data.List (tails)
+import System.Random
+import System.IO.Unsafe
 
 (+*) :: (String, Kind) -> Ctx -> Result Ctx
 (s, k) +* ctx = do
   s ?! ctx
-  ok ((s, HasKind k) : ctx)
+  ok (ctx ++ [(s, HasKind k)])
 
 (+.) :: (String, Type) -> Ctx -> Result Ctx
 (s, t) +. ctx = do
   s ?! ctx
-  ok ((s, HasType t) : ctx)
+  ok (ctx ++ [(s, HasType t)])
 
-(+-) :: (String, Constr) -> Ctx -> Result Ctx
-(s, c) +- ctx = do
-  ok ((s, HasConstr c) : ctx)
+(+-) :: Constr -> Ctx -> Result Ctx
+c +- ctx = do
+  ok (ctx ++ [("__constraint", HasConstr c)])
+(+-*) :: [Constr] -> Ctx -> Result Ctx
+[] +-* ctx = ok ctx
+(x : xs) +-* ctx = do
+  ctx' <- x +- ctx
+  xs +-* ctx'
 
 (*?) :: String -> Ctx -> Result Kind
 s *? ctx = case find (\(s', _) -> s' == s) ctx of
   Just (_, HasKind k) -> ok k
-  _ -> raise ("could not resolve kind " ++ s)
+  _ -> raise ("[CTX] could not resolve kind " ++ s ++ " in " ++ show ctx)
 
 (.?) :: String -> Ctx -> Result Type
 s .? ctx = case find (\(s', _) -> s' == s) ctx of
   Just (_, HasType t) -> ok t
-  _ -> raise ("could not resolve type " ++ s)
-
-(-?) :: String -> Ctx -> Result Constr
-s -? ctx = case find (\(s', _) -> s' == s) ctx of
-  Just (_, HasConstr c) -> ok c
-  _ -> raise ("could not resolve constraint " ++ s)
+  _ -> raise ("[CTX] could not resolve type " ++ s ++ " in " ++ show ctx)
 
 (?!) :: String -> Ctx -> Result ()
 s ?! ctx = case find (\(s', _) -> s' == s) ctx of
-  Just _ -> raise ("variable " ++ s ++ " already defined")
+  Just _ -> raise ("[CTX] variable " ++ s ++ " already defined")
   _ -> ok ()
+
+freshVar :: String
+freshVar = take 32 $ randomRs ('a','z') $ unsafePerformIO newStdGen
+
+rev :: Ctx -> Ctx
+rev = foldl (flip (:)) []
+
+domOnly :: Ctx -> Result ()
+domOnly [] = ok ()
+domOnly (x : xs) = case x of  
+  (_, HasKind (KDom _)) -> domOnly xs 
+  _ -> raise ("[CTX] found non domain " ++ show x ++ " in ctx")
 
 gd :: Ctx -> Ctx
 gd [] = []
@@ -71,5 +79,28 @@ gu (x : xs) = case x of
     _ -> gu xs
   _ -> gu xs
 
+domGu :: Ctx -> [Type]
+domGu [] = []
+domGu (x : xs) = case x of
+  (s, HasKind k) -> case k of
+    KDom _ -> TVar s : domGu xs
+    _ -> domGu xs
+  _ -> domGu xs
+
+pairs :: [a] -> [(a, a)]
+pairs l = [(x, y) | (x:ys) <- tails l, y <- ys]
+
+combs :: [a] -> [a] -> [(a, a)]
+combs l l' = [(x, y) | x <- l, y <- l']
+
+merge :: [(Type, Type)] -> Ctx
+merge = map (\(x, y) -> ("__constraint", HasConstr (x, y)))
+
+dce2 :: Ctx -> Ctx
+dce2 ctx = merge (pairs (domGu ctx))
+
+dce12 :: Ctx -> Ctx -> Ctx
+dce12 ctx ctx' = merge (combs (domGu ctx) (domGu ctx'))
+
 dce :: Ctx -> Ctx -> Ctx
-dce _ _ = []
+dce ctx ctx' = ctx ++ ctx' ++ dce2 ctx' ++ dce12 ctx ctx'

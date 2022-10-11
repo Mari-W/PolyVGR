@@ -5,122 +5,135 @@ import Context
 import Data.Bifunctor (Bifunctor (bimap))
 import Data.Either (fromRight)
 import Result
+import Data.Foldable
 
-kEq :: Ctx -> Kind -> Kind -> Result ()
-kEq ctx KType KType = ok ()
-kEq ctx KSession KSession = ok ()
-kEq ctx KState KState = ok ()
-kEq ctx KShape KShape = ok ()
-kEq ctx (KDom t) (KDom t') = tEq ctx t t'
-kEq ctx (KLam k1 k1') (KLam k2 k2') = do
-  kEq ctx k1 k2
-  kEq ctx k1' k2'
-kEq _ k k' = raise ("[K-Eq] kind mismatch between " ++ show k ++ " and " ++ show k')
+shEq :: Type -> Type -> Result ()
+shEq (TVar a) (TVar b) = if a == b then ok () else raise ("[K-Eq] domain mismatch between " ++ show a ++ " and " ++ show b)
+shEq SHEmpty SHEmpty = ok ()
+shEq SHSingle SHSingle  = ok ()
+shEq (SHDisjoint l1 r1) (SHDisjoint l2 r2) = do
+  shEq l1 l2
+  shEq r1 r2
+shEq t1 t2 = raise ("[K-Eq] domain mismatch between " ++ show t1 ++ " and " ++ show t2)
 
-kEqs :: Ctx -> Kind -> [Kind] -> Result ()
-kEqs ctx k = mapM_ (kEq ctx k)
+kEq :: Kind -> Kind -> Result ()
+kEq KType KType = ok ()
+kEq KSession KSession = ok ()
+kEq KState KState = ok ()
+kEq KShape KShape = ok ()
+kEq (KDom t1) (KDom t2) = shEq t1 t2
+kEq (KLam d1 c1) (KLam d2 c2) = do
+  kEq d1 d2
+  kEq c1 c2
+kEq k1 k2 = raise ("[K-Eq] kind mismatch between " ++ show k1 ++ " and " ++ show k2)
 
-tNf :: Ctx -> Type -> Result Type
+kEqs ::  Kind -> [Kind] -> Result ()
+kEqs ks = mapM_ (kEq ks)
+
+kNEq :: Kind -> Kind -> Result ()
+kNEq k1 k2 = do
+  case kEq k1 k2 of 
+    Left _ -> ok ()
+    Right _ -> raise ("[K-Eq] kind " ++ show k1 ++ " cannot be " ++ show k2)
+
+
+tNf :: Type -> Type
 {- TC-TApp -}
-tNf ctx (TApp (TLam s d t) t') = do
-  ctx' <- (s, d) +. ctx
-  tNf ctx' t'
+tNf (TApp (TLam s d t) t') = EUnit 
 {- TC-Proj -}
-tNf ctx (DProj l (DMerge d d')) = case l of
-  LLeft -> tNf ctx d
-  LRight -> tNf ctx d'
+tNf (DProj l (DMerge d d')) = case l of
+  LLeft -> tNf d
+  LRight -> tNf d'
 {- TC-DualVar -}
-tNf ctx (SDual (SDual (TVar i))) = ok (TVar i)
+tNf (SDual (SDual (TVar i))) = TVar i
 {- TC-DualEnd -}
-tNf ctx (SDual SEnd) = ok SEnd
+tNf (SDual SEnd) = SEnd
 {- TC-DualSend -}
-tNf ctx (SDual (SSend n sh st t s)) = do
-  dual <- tNf ctx (SDual s)
-  ok (SRecv n sh st t dual)
+tNf (SDual (SSend n sh st t s)) = SRecv n sh st t (tNf (SDual s))
 {- TC-DualRecv -}
-tNf ctx (SDual (SRecv n sh st t s)) = do
-  dual <- tNf ctx (SDual s)
-  ok (SSend n sh st t dual)
+tNf (SDual (SRecv n sh st t s)) = SSend n sh st t (tNf  (SDual s))
 {- TC-DualChoice -}
-tNf ctx (SDual (SChoice st st')) = do
-  dual <- tNf ctx (SDual st)
-  dual' <- tNf ctx (SDual st')
-  ok (SBranch dual dual')
+tNf (SDual (SChoice st st')) = SBranch (tNf (SDual st)) (tNf (SDual st'))
 {- TC-DualBranch -}
-tNf ctx (SDual (SBranch st st')) = do
-  dual <- tNf ctx (SDual st)
-  dual' <- tNf ctx (SDual st')
-  ok (SChoice dual dual')
+tNf (SDual (SBranch st st')) = SChoice (tNf (SDual st)) (tNf (SDual st'))
 {- recurse -}
-tNf ctx (TLam s d t) = do
-  d <- tNf ctx d
-  t <- tNf ctx t
-  ok (TLam s d t)
-tNf ctx (EAll s k constrs t) = do
-  {-TODO constrs <- sequence (map (sequence (bimap (tNf ctx) (tNf ctx))) constrs)-}
-  t <- tNf ctx t
-  ok (EAll s k constrs t)
-tNf ctx (EArr s t s' t') = do
-  s <- tNf ctx s
-  t <- tNf ctx t
-  s' <- tNf ctx s'
-  t' <- tNf ctx t'
-  ok (EArr s t s' t')
-tNf ctx (EChan t) = do
-  t <- tNf ctx t
-  ok (EChan t)
-tNf ctx (EAcc t) = do
-  t <- tNf ctx t
-  ok (EAcc t)
-tNf ctx (EPair t t') = do
-  t <- tNf ctx t
-  t' <- tNf ctx t'
-  ok (EPair t t')
-tNf ctx (SSend n d s t t') = do
-  d <- tNf ctx d
-  s <- tNf ctx s
-  t <- tNf ctx t
-  t' <- tNf ctx t'
-  ok (SSend n d s t t')
-tNf ctx (SRecv n d s t t') = do
-  d <- tNf ctx d
-  s <- tNf ctx s
-  t <- tNf ctx t
-  t' <- tNf ctx t'
-  ok (SRecv n d s t t')
-tNf ctx (SChoice t t') = do
-  t <- tNf ctx t
-  t' <- tNf ctx t'
-  ok (SChoice t t')
-tNf ctx (SBranch t t') = do
-  t <- tNf ctx t
-  t' <- tNf ctx t'
-  ok (SBranch t t')
-tNf ctx (SDual t) = do
-  t <- tNf ctx t
-  ok (SDual t)
-tNf ctx (DMerge d d') = do
-  d <- tNf ctx d
-  d' <- tNf ctx d'
-  ok (DMerge d d')
-tNf ctx (SSBind t t') = do
-  t <- tNf ctx t
-  t' <- tNf ctx t'
-  ok (SSBind t t')
-tNf ctx t = ok t
+tNf (TLam s d t) = TLam s (tNf d) (tNf t)
+tNf (EAll s k cs t) = EAll s k (map (bimap tNf tNf) cs) (tNf  t)
+tNf (EArr s t ctx' s' t') = EArr (tNf s) (tNf t) ctx' (tNf s') (tNf t')
+tNf (EChan t) = EChan (tNf t)
+tNf (EAcc t) = EAcc (tNf t)
+tNf (EPair t t') = EPair (tNf t) (tNf t')
+tNf (SSend n k s t t') = SSend n k (tNf s) (tNf t) (tNf t')
+tNf (SRecv n k s t t') = SRecv n k (tNf s) (tNf t) (tNf t')
+tNf (SChoice t t') = SChoice (tNf t) (tNf t')
+tNf (SBranch t t') = SBranch (tNf t) (tNf t')
+tNf (SDual t) = SDual (tNf t)
+tNf (DMerge d d') = DMerge (tNf d) (tNf d')
+tNf (SSBind t t') = SSBind (tNf t) (tNf t')
+tNf t = t
 
 tEq :: Ctx -> Type -> Type -> Result ()
-tEq ctx t t' = do 
-  t <- tNf ctx t
-  t' <- tNf ctx t'
-  tEq' ctx t t'
+tEq ctx t t' = tEq' ctx [] (tNf t) (tNf t')
 
-tEq' :: Ctx -> Type -> Type -> Result ()
-tEq' ctx (TVar a) (TVar b) = do 
-  t <- a .? ctx
-  t' <- b .? ctx 
-  tEq' ctx t t'
-tEq' ctx (TApp d c) (TApp d' c') = do 
-  tEq' ctx d d'
-  tEq' ctx c c'
-tEq' ctx ..
+type Equiv = (String, String)
+
+tEq' :: Ctx -> [Equiv] -> Type -> Type -> Result ()
+tEq' ctx eqs (TVar a) (TVar b) = do 
+  case (find (\ (x, y) -> x == a && y == b) eqs,
+       find (\ (x, y) -> x == b && y == a) eqs) of 
+    (Nothing, Nothing) -> if a /= b then raise ("[T-Eq] variable name mismatch between " ++ a ++ " and " ++ "b") else ok ()
+    _ -> ok ()
+  ok ()
+tEq' ctx eqs (TApp d c) (TApp d' c') = do 
+  tEq' ctx eqs d d'
+  tEq' ctx eqs c c'
+tEq' ctx eqs (TLam s d t)  (TLam s' d' t') = do
+  tEq' ctx eqs d d'
+  tEq' ctx ((s, s') : eqs) t t'
+tEq' ctx eqs (EArr st1 t1 ctx' st1' t1') (EArr st2 t2 ctx'' st2' t2') = do
+  tEq' ctx eqs st1 st2
+  tEq' ctx eqs t1 t2
+  tEq' ctx eqs st1' st2'
+  tEq' ctx eqs t1' t2'
+tEq' ctx eqs (EAll s k cs t) (EAll s' k' cs' t') = do
+  kEq k k'
+  {- Gamma, C1 |- C2 und Gamma, C2 |- C1 fordern -}
+  tEq' ctx ((s, s') : eqs) t t'
+tEq' ctx eqs (EChan t) (EChan t') = tEq' ctx eqs t t'
+tEq' ctx eqs (EAcc t) (EAcc t') = tEq' ctx eqs t t'
+tEq' ctx eqs EUnit EUnit = ok ()
+tEq' ctx eqs (SSend n k s t c) (SSend n' k' s' t' c') = do
+  kEq k k' 
+  tEq' ctx ((n, n') : eqs) s s' 
+  tEq' ctx ((n, n') : eqs) t t'
+  tEq' ctx eqs c c'
+tEq' ctx eqs (SRecv n k s t c) (SRecv n' k' s' t' c') = do
+  kEq k k' 
+  tEq' ctx ((n, n') : eqs) s s' 
+  tEq' ctx ((n, n') : eqs) t t'
+  tEq' ctx eqs c c'  
+tEq' ctx eqs (SChoice l r) (SChoice l' r') = do
+  tEq' ctx eqs l l'
+  tEq' ctx eqs r r'
+tEq' ctx eqs (SBranch l r) (SBranch l' r') = do
+  tEq' ctx eqs l l'
+  tEq' ctx eqs r r'
+tEq' ctx eqs SEnd SEnd = ok ()
+tEq' ctx eqs (SDual t) (SDual t') = unreachable
+tEq' ctx eqs SHEmpty SHEmpty = ok ()
+tEq' ctx eqs (SHDisjoint l r) (SHDisjoint l' r') = do
+  tEq' ctx eqs l l'
+  tEq' ctx eqs r r'
+tEq' ctx eqs DEmpty DEmpty = ok ()
+tEq' ctx eqs (DMerge l r) (DMerge l' r') = do
+  tEq' ctx eqs l l'
+  tEq' ctx eqs r r'
+tEq' ctx eqs (DProj l t) (DProj l' t') = unreachable
+tEq' ctx eqs SSEmpty SSEmpty  = ok ()
+tEq' ctx eqs (SSBind d t) (SSBind d' t') = do
+  tEq' ctx eqs d d'
+  tEq' ctx eqs t t'
+tEq' ctx eqs (SSMerge l r) (SSMerge l' r') = do
+  tEq' ctx eqs l l'
+  tEq' ctx eqs r r'
+tEq' ctx eqs a b = raise ("[T-Eq] type mismatch between " ++ show a ++ " and " ++ show b)   
