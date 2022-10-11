@@ -85,12 +85,15 @@ tEq' ctx eqs (EArr st1 t1 ctx' st1' t1') (EArr st2 t2 ctx'' st2' t2') = do
   tEq' ctx eqs st1 st2
   tEq' ctx eqs t1 t2
   {- ctxEq ctx' ctx'' -}
-  tEq' ctx eqs st1' st2'
-  tEq' ctx eqs t1' t2'
+  let eqs' = zip (map fst ctx') (map fst ctx'') ++ eqs
+  tEq' ctx eqs'  st1' st2'
+  tEq' ctx eqs'  t1' t2'
 tEq' ctx eqs (EAll s k cs t) (EAll s' k' cs' t') = do
   kEq ctx k k'
+  let cs' = renCstrsM eqs cs'
   {- Gamma, C1 |- C2 und Gamma, C2 |- C1 fordern -}
-  tEq' ctx ((s, s') : eqs) t t'
+  ctx' <- cs +-* ctx
+  tEq' ctx' ((s, s') : eqs) t t'
 tEq' ctx eqs (EChan t) (EChan t') = tEq' ctx eqs t t'
 tEq' ctx eqs (EAcc t) (EAcc t') = tEq' ctx eqs t t'
 tEq' ctx eqs EUnit EUnit = ok ()

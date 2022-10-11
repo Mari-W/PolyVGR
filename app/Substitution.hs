@@ -63,6 +63,10 @@ freeT bs (SSMerge l r) = freeT bs l ++ freeT bs r
 renCstrs :: String -> String -> [Cstr] -> [Cstr]
 renCstrs x1 x2 = subCstrs x1 (TVar x2)
 
+renCstrsM :: [(String, String)] -> [Cstr] -> [Cstr]
+renCstrsM [] cs = cs
+renCstrsM ((x, y) : xs) cs = renCstrsM xs (renCstrs y x cs)
+
 renCtx :: String -> String -> Ctx -> Ctx 
 renCtx x1 x2 = subCtx x1 (TVar x2)
 

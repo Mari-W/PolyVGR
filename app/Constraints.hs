@@ -39,23 +39,19 @@ filterCstrs (x : xs) = case x of
   (_, HasCstr c) -> c : filterCstrs xs
   _ -> filterCstrs xs
 
-{-s earchCstr :: [Disjoint] -> Disjoint -> Result ()
+searchCstr :: [Disjoint] -> Disjoint -> Result ()
 searchCstr [] _ = raise "[CE] constraint not resolved"
-searchCstr xs (_, DEmpty) = ok ()
-searchCstr xs (DEmpty, _) = ok ()
 searchCstr ((x, y) : xs) (a, b) = do
-  case (domEq x a, domEq y b) of
-    (Right _, Right _) -> ok ()
-    _ -> case (domEq x b, domEq y a) of
-      (Right _, Right _) -> ok ()
-      _ -> searchCstr xs (a, b)
+  if (x == a && y == b) || (x == b && y == a) then
+    ok ()
+  else searchCstr xs (a, b)
 
 
-searchCstrs :: [Cstr] -> [Cstr] -> Result ()
+searchCstrs :: [Disjoint] -> [Disjoint] -> Result ()
 searchCstrs atms (x : xs) = do
   searchCstr atms x
   searchCstrs atms xs
-searchCstrs atms [] = ok () -}
+searchCstrs atms [] = ok ()
 
 
 statesDisjunct :: Ctx -> Type -> Type -> Result ()
@@ -64,4 +60,4 @@ statesDisjunct ctx ssl ssr = do
   dssr <- stateDom ssr
   let cstrs = splitCstr (dssl, dssr)
   let assm = splitCstrs (filterCstrs ctx)
-  ok ()
+  searchCstrs assm cstrs
