@@ -12,7 +12,6 @@ t1 = EAll "c" (KDom SHSingle) [] (
       )
     )
 
-
 t2 = EAll "n1" KShape [] (
       EAll "ss1" (KLam (KDom (TVar "n1")) KState) [] (
         EAll "n2" KShape [] (
@@ -69,8 +68,8 @@ t3 = EAll "n" KShape [] (
         )
       )
     ) 
-    
+
 main :: IO ()
-main = case kind [] t3 of   
+main = case kind [] t2 of   
   Left s -> putStrLn s
   Right ki -> print ki

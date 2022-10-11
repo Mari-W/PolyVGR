@@ -6,6 +6,7 @@ import Context
 import Equality
 import Data.List
 
+type Disjoint = (String, String)
 
 stateDom :: Type -> Result Type
 stateDom SSEmpty = ok DEmpty 
@@ -16,8 +17,6 @@ stateDom (SSMerge l r) = do
   dr <- stateDom r
   ok (DMerge dl dr)
 stateDom t = raise ("[CE] expected state to extract dom of, got " ++ show t)
-
-type Disjoint = (String, String)
 
 splitCstr :: Cstr -> [Disjoint]
 splitCstr (DEmpty, _) = []
@@ -46,13 +45,11 @@ searchCstr ((x, y) : xs) (a, b) = do
     ok ()
   else searchCstr xs (a, b)
 
-
 searchCstrs :: [Disjoint] -> [Disjoint] -> Result ()
 searchCstrs atms (x : xs) = do
   searchCstr atms x
   searchCstrs atms xs
 searchCstrs atms [] = ok ()
-
 
 statesDisjunct :: Ctx -> Type -> Type -> Result ()
 statesDisjunct ctx ssl ssr = do

@@ -39,7 +39,6 @@ cwf' ((x, h) : xs) = case h of
       (KDom _, KDom _) -> cwf' xs
       _ -> raise ("[CF-ConsCstr] expected domains as constraints, got " ++ show kl ++ " and " ++ show kr)   
 
-
 kind :: Ctx -> Type -> Result Kind
 {- K-Var -}
 kind ctx (TVar s) = s *? ctx

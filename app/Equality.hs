@@ -7,6 +7,8 @@ import Result
 import Data.Foldable
 import Substitution
 
+type Equiv = (String, String)
+
 kEq :: Ctx -> Kind -> Kind -> Result ()
 kEq ctx KType KType = ok ()
 kEq ctx KSession KSession = ok ()
@@ -26,7 +28,6 @@ kNEq ctx k1 k2 = do
   case kEq ctx k1 k2 of 
     Left _ -> ok ()
     Right _ -> raise ("[K-Eq] kind " ++ show k1 ++ " cannot be " ++ show k2)
-
 
 tNf :: Type -> Type
 {- TC-TApp -}
@@ -65,8 +66,6 @@ tNf t = t
 
 tEq :: Ctx -> Type -> Type -> Result ()
 tEq ctx t t' = tEq' ctx [] (tNf t) (tNf t')
-
-type Equiv = (String, String)
 
 tEq' :: Ctx -> [Equiv] -> Type -> Type -> Result ()
 tEq' ctx eqs (TVar a) (TVar b) = do 
