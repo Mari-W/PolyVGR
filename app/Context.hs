@@ -1,10 +1,6 @@
 module Context where
 
 import Ast
-  ( Constr, Has (HasConstr, HasKind, HasType),
-    Kind (KDom, KLam, KSession, KShape, KState, KType),
-    Type (DMerge, TVar), Ctx
-  )
 import Data.Foldable (find)
 import Result ( ok, raise, Result )
 import Data.List (tails)
@@ -21,10 +17,10 @@ import System.IO.Unsafe
   s ?! ctx
   ok (ctx ++ [(s, HasType t)])
 
-(+-) :: Constr -> Ctx -> Result Ctx
+(+-) :: Cstr -> Ctx -> Result Ctx
 c +- ctx = do
-  ok (ctx ++ [("__constraint", HasConstr c)])
-(+-*) :: [Constr] -> Ctx -> Result Ctx
+  ok (ctx ++ [("__constraint", HasCstr c)])
+(+-*) :: [Cstr] -> Ctx -> Result Ctx
 [] +-* ctx = ok ctx
 (x : xs) +-* ctx = do
   ctx' <- x +- ctx
@@ -94,7 +90,7 @@ combs :: [a] -> [a] -> [(a, a)]
 combs l l' = [(x, y) | x <- l, y <- l']
 
 merge :: [(Type, Type)] -> Ctx
-merge = map (\(x, y) -> ("__constraint", HasConstr (x, y)))
+merge = map (\(x, y) -> ("__constraint", HasCstr (x, y)))
 
 dce2 :: Ctx -> Ctx
 dce2 ctx = merge (pairs (domGu ctx))

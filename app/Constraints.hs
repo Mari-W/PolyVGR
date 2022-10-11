@@ -7,37 +7,61 @@ import Equality
 import Data.List
 
 
-
-dom :: Type -> Result Type
-dom SSEmpty = ok DEmpty 
-dom (SSBind d s) = ok d 
-dom (TApp _ d) = ok d 
-dom (SSMerge l r) = do
-  dl <- dom l
-  dr <- dom r
+stateDom :: Type -> Result Type
+stateDom SSEmpty = ok DEmpty 
+stateDom (SSBind d s) = ok d 
+stateDom (TApp _ d) = ok d 
+stateDom (SSMerge l r) = do
+  dl <- stateDom l
+  dr <- stateDom r
   ok (DMerge dl dr)
-dom t = raise ("[CE] expected state to extract dom of, got " ++ show t)
+stateDom t = raise ("[CE] expected state to extract dom of, got " ++ show t)
 
-flatten :: Type -> Result [String]
-flatten (TVar x) = ok [x]
-flatten DEmpty  = ok []
-flatten (DProj l d) = do
-  case d of
-    DMerge dl dr -> case l of
-      LLeft -> flatten dl
-      LRight -> flatten dr
-    _ -> unreachable
-flatten (DMerge l r) = do
-  fl <- flatten l
-  fr <- flatten r
-  ok (fl ++ fr)
-flatten t = raise ("[CE] expected to flatten domain, got " ++ show t)
+type Disjoint = (String, String)
+
+splitCstr :: Cstr -> [Disjoint]
+splitCstr (DEmpty, _) = []
+splitCstr (DProj l d, d') = case d of
+  DMerge dl dr -> case l of
+    LLeft -> splitCstr (dl, d')
+    LRight -> splitCstr (dr, d')
+  _ -> error "unreachable"
+splitCstr (DMerge d d', d'') = splitCstr (d, d'') ++ splitCstr (d', d'')
+splitCstr (TVar i, TVar j) = [(i, j)]
+splitCstr (d, d') = splitCstr (d', d)
+
+splitCstrs :: [Cstr] -> [Disjoint]
+splitCstrs = concatMap splitCstr
+
+filterCstrs :: Ctx -> [Cstr]
+filterCstrs [] = []
+filterCstrs (x : xs) = case x of
+  (_, HasCstr c) -> c : filterCstrs xs
+  _ -> filterCstrs xs
+
+{-s earchCstr :: [Disjoint] -> Disjoint -> Result ()
+searchCstr [] _ = raise "[CE] constraint not resolved"
+searchCstr xs (_, DEmpty) = ok ()
+searchCstr xs (DEmpty, _) = ok ()
+searchCstr ((x, y) : xs) (a, b) = do
+  case (domEq x a, domEq y b) of
+    (Right _, Right _) -> ok ()
+    _ -> case (domEq x b, domEq y a) of
+      (Right _, Right _) -> ok ()
+      _ -> searchCstr xs (a, b)
 
 
-stateDisjunct :: Type -> Type -> Result ()
-stateDisjunct ssl ssr = do
-  dssl <- dom ssl
-  dssr <- dom ssr
-  fssl <- flatten dssl
-  fssr <- flatten dssr
+searchCstrs :: [Cstr] -> [Cstr] -> Result ()
+searchCstrs atms (x : xs) = do
+  searchCstr atms x
+  searchCstrs atms xs
+searchCstrs atms [] = ok () -}
+
+
+statesDisjunct :: Ctx -> Type -> Type -> Result ()
+statesDisjunct ctx ssl ssr = do
+  dssl <- stateDom ssl
+  dssr <- stateDom ssr
+  let cstrs = splitCstr (dssl, dssr)
+  let assm = splitCstrs (filterCstrs ctx)
   ok ()

@@ -13,7 +13,7 @@ data Type
   = TVar String
   | TApp Type Type
   | TLam String Type Type
-  | EAll String Kind [Constr] Type
+  | EAll String Kind [Cstr] Type
   | EArr Type Type Ctx Type Type
   | EChan Type
   | EAcc Type
@@ -57,7 +57,7 @@ data Val
   = VVar String
   | VUnit
   | VPair Val Val
-  | VTAbs String Kind [Constr] Val
+  | VTAbs String Kind [Cstr] Val
   | VChan Type
   | VAbs Type String Type Expr
   deriving (Show, Eq)
@@ -67,12 +67,12 @@ data Label
   | LRight
   deriving (Show, Eq)
 
-type Constr = (Type, Type)
+type Cstr = (Type, Type)
 
 data Has
   = HasType Type
   | HasKind Kind
-  | HasConstr Constr
+  | HasCstr Cstr
   deriving (Show, Eq)
 
 type Ctx = [(String, Has)]

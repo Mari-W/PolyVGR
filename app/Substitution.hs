@@ -10,14 +10,14 @@ type Free = String
 flatten :: [[a]] -> [a]
 flatten arr = [y | x<- arr, y <- x]
 
-freeCstrs :: [Bind] -> [Constr] -> [Free]
+freeCstrs :: [Bind] -> [Cstr] -> [Free]
 freeCstrs bs cs = flatten (map (\(x, y) -> freeT bs x ++ freeT bs y) cs)
 
 freeCtx :: [Bind] -> Ctx -> [Free]
 freeCtx bs [] = []
 freeCtx bs ((s, HasKind k) : xs) = freeK bs k ++ freeCtx (s : bs) xs 
 freeCtx bs ((s, HasType t) : xs) = freeT bs t ++ freeCtx (s : bs) xs
-freeCtx bs ((s, HasConstr c) : xs) = freeCstrs bs [c] ++ freeCtx bs xs
+freeCtx bs ((s, HasCstr c) : xs) = freeCstrs bs [c] ++ freeCtx bs xs
 
 freeK :: [Bind] -> Kind -> [Free]
 freeK bs (KDom t) = freeT bs t
@@ -60,7 +60,7 @@ freeT bs SSEmpty = []
 freeT bs (SSBind l r) = freeT bs l ++ freeT bs r
 freeT bs (SSMerge l r) = freeT bs l ++ freeT bs r
 
-renCstrs :: String -> String -> [Constr] -> [Constr]
+renCstrs :: String -> String -> [Cstr] -> [Cstr]
 renCstrs x1 x2 = subCstrs x1 (TVar x2)
 
 renCtx :: String -> String -> Ctx -> Ctx 
@@ -72,7 +72,7 @@ renK x1 x2 = subK x1 (TVar x2)
 renT :: String -> String -> Type -> Type
 renT x1 x2 = subT x1 (TVar x2)
 
-subCstrs :: String -> Type -> [Constr] -> [Constr]
+subCstrs :: String -> Type -> [Cstr] -> [Cstr]
 subCstrs x s = map (bimap (subT x s) (subT x s))
 
 subCtx :: String -> Type -> Ctx -> Ctx
@@ -81,8 +81,13 @@ subCtx x s ((x2, i) : xs) = do
   let r = case i of
             HasType t -> HasType (subT x s t)
             HasKind k -> HasKind (subK x s k)
-            HasConstr c -> HasConstr (head (subCstrs x s [c]))
-  if x /= x2 then (x2, r) : subCtx x s xs else (x2, r) : xs
+            HasCstr c -> HasCstr(head (subCstrs x s [c]))
+  if x /= x2 then case find (== x2) (freeT [] s) of
+    Nothing -> (x2, r) : subCtx x s xs
+    Just str -> do
+      let v = freshVar 
+      (v, r) : subCtx x s (renCtx x2 v xs)
+  else (x2, r) : xs
 
 subK :: String -> Type -> Kind -> Kind
 subK x s (KDom t) = KDom (subT x s t)

@@ -5,6 +5,9 @@ import Ast
 import Result
 import Equality 
 
+
+{- extract state from another, get rest -}
+
 stSplit :: Ctx -> Type -> Type -> Result (Type, Maybe Type)
 stSplit ctx SSEmpty d = ok (SSEmpty, Nothing)
 stSplit ctx (SSBind d1 s) d2 = do

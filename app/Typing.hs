@@ -26,7 +26,7 @@ typeV ctx (VTAbs s k cs v) = do
   ctx' <- (s, k) +* ctx'
   tv <- typeV ctx' v
   kt <- kind ctx tv
-  kEq kt KType
+  kEq ctx kt KType
   ok tv
 {- T-Chan -}
 typeV ctx (VChan d) = do
@@ -39,7 +39,7 @@ typeV ctx (VAbs st s t e) = do
   ctx' <- (s, t) +. ctx
   (ctx', st', te) <- typeE ctx' st e
   ke <- kind ctx te
-  kEq ke KType 
+  kEq ctx ke KType 
   ok (EArr st t ctx' st' te)
 
 typeE :: Ctx -> Type -> Expr -> Result (Ctx, Type, Type)
@@ -77,14 +77,14 @@ typeE ctx st (AApp v t) = do
   case tv of
     EAll s k cs c -> do
       kt <- kind ctx t
-      kEq kt k
+      kEq ctx kt k
       {- todo Γ ⊢ {𝑇 ′/𝛼 }C -}
       ok ([], st, tNf (subT s t c))
     _ -> raise ("[T-TApp] expected to apply to forall abstraction, got " ++ show tv)
 {- T-New -}
 typeE ctx st (New t) = do
   kt <- kind ctx t
-  kEq kt KSession 
+  kEq ctx kt KSession 
   ok ([], st, EAcc t)
 {- T-Request -}
 typeE ctx st (Req v) = do
@@ -109,7 +109,7 @@ typeE ctx st (Send v1 v2) = do
   case tv2 of 
     EChan d1 -> do
       kd1 <- kind ctx d1
-      kEq kd1 (KDom SHSingle)
+      kEq ctx kd1 (KDom SHSingle)
       sp <- stSplit ctx st d1
       case sp of 
         (r , Just (SSend x kd2 st1 t1 s)) -> do
@@ -131,7 +131,7 @@ typeE ctx st (Recv v) = do
         (r , Just (SRecv x kd2 st1 t1 s)) -> do
           kwf ctx kd2
           kd1 <- kind ctx d1
-          kEq kd1 (KDom SHSingle)
+          kEq ctx kd1 (KDom SHSingle)
           ok ([(x, HasKind kd2)], SSMerge r (SSMerge st1 (SSBind d1 s)), t1)
         _ -> raise ("[T-Recv] expected receive channel (i.e ?s) along a state including their binding, got " ++ show tv ++ " and " ++ show st)
     _ -> raise ("[T-Send] expected channel to receive (i.e ?s) on got along their state binding" ++ show tv ++ " and " ++ show st)

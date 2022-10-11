@@ -7,32 +7,23 @@ import Data.Either (fromRight)
 import Result
 import Data.Foldable
 
-shEq :: Type -> Type -> Result ()
-shEq (TVar a) (TVar b) = if a == b then ok () else raise ("[K-Eq] domain mismatch between " ++ show a ++ " and " ++ show b)
-shEq SHEmpty SHEmpty = ok ()
-shEq SHSingle SHSingle  = ok ()
-shEq (SHDisjoint l1 r1) (SHDisjoint l2 r2) = do
-  shEq l1 l2
-  shEq r1 r2
-shEq t1 t2 = raise ("[K-Eq] domain mismatch between " ++ show t1 ++ " and " ++ show t2)
+kEq :: Ctx -> Kind -> Kind -> Result ()
+kEq ctx KType KType = ok ()
+kEq ctx KSession KSession = ok ()
+kEq ctx KState KState = ok ()
+kEq ctx KShape KShape = ok ()
+kEq ctx (KDom t1) (KDom t2) = tEq ctx t1 t2
+kEq ctx (KLam d1 c1) (KLam d2 c2) = do
+  kEq ctx d1 d2
+  kEq ctx c1 c2
+kEq ctx k1 k2 = raise ("[K-Eq] kind mismatch between " ++ show k1 ++ " and " ++ show k2)
 
-kEq :: Kind -> Kind -> Result ()
-kEq KType KType = ok ()
-kEq KSession KSession = ok ()
-kEq KState KState = ok ()
-kEq KShape KShape = ok ()
-kEq (KDom t1) (KDom t2) = shEq t1 t2
-kEq (KLam d1 c1) (KLam d2 c2) = do
-  kEq d1 d2
-  kEq c1 c2
-kEq k1 k2 = raise ("[K-Eq] kind mismatch between " ++ show k1 ++ " and " ++ show k2)
+kEqs :: Ctx -> Kind -> [Kind] -> Result ()
+kEqs ctx ks = mapM_ (kEq ctx ks)
 
-kEqs ::  Kind -> [Kind] -> Result ()
-kEqs ks = mapM_ (kEq ks)
-
-kNEq :: Kind -> Kind -> Result ()
-kNEq k1 k2 = do
-  case kEq k1 k2 of 
+kNEq :: Ctx -> Kind -> Kind -> Result ()
+kNEq ctx k1 k2 = do
+  case kEq ctx k1 k2 of 
     Left _ -> ok ()
     Right _ -> raise ("[K-Eq] kind " ++ show k1 ++ " cannot be " ++ show k2)
 
@@ -96,19 +87,19 @@ tEq' ctx eqs (EArr st1 t1 ctx' st1' t1') (EArr st2 t2 ctx'' st2' t2') = do
   tEq' ctx eqs st1' st2'
   tEq' ctx eqs t1' t2'
 tEq' ctx eqs (EAll s k cs t) (EAll s' k' cs' t') = do
-  kEq k k'
+  kEq ctx k k'
   {- Gamma, C1 |- C2 und Gamma, C2 |- C1 fordern -}
   tEq' ctx ((s, s') : eqs) t t'
 tEq' ctx eqs (EChan t) (EChan t') = tEq' ctx eqs t t'
 tEq' ctx eqs (EAcc t) (EAcc t') = tEq' ctx eqs t t'
 tEq' ctx eqs EUnit EUnit = ok ()
 tEq' ctx eqs (SSend n k s t c) (SSend n' k' s' t' c') = do
-  kEq k k' 
+  kEq ctx k k' 
   tEq' ctx ((n, n') : eqs) s s' 
   tEq' ctx ((n, n') : eqs) t t'
   tEq' ctx eqs c c'
 tEq' ctx eqs (SRecv n k s t c) (SRecv n' k' s' t' c') = do
-  kEq k k' 
+  kEq ctx k k' 
   tEq' ctx ((n, n') : eqs) s s' 
   tEq' ctx ((n, n') : eqs) t t'
   tEq' ctx eqs c c'  
