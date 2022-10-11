@@ -3,9 +3,9 @@ module Equality where
 import Ast
 import Context
 import Data.Bifunctor (Bifunctor (bimap))
-import Data.Either (fromRight)
 import Result
 import Data.Foldable
+import Substitution
 
 kEq :: Ctx -> Kind -> Kind -> Result ()
 kEq ctx KType KType = ok ()
@@ -30,7 +30,7 @@ kNEq ctx k1 k2 = do
 
 tNf :: Type -> Type
 {- TC-TApp -}
-tNf (TApp (TLam s d t) t') = EUnit 
+tNf (TApp (TLam s d t) t') = subT s t' t
 {- TC-Proj -}
 tNf (DProj l (DMerge d d')) = case l of
   LLeft -> tNf d
@@ -84,6 +84,7 @@ tEq' ctx eqs (TLam s d t)  (TLam s' d' t') = do
 tEq' ctx eqs (EArr st1 t1 ctx' st1' t1') (EArr st2 t2 ctx'' st2' t2') = do
   tEq' ctx eqs st1 st2
   tEq' ctx eqs t1 t2
+  {- ctxEq ctx' ctx'' -}
   tEq' ctx eqs st1' st2'
   tEq' ctx eqs t1' t2'
 tEq' ctx eqs (EAll s k cs t) (EAll s' k' cs' t') = do
