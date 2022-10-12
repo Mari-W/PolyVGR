@@ -24,20 +24,17 @@ stDisj ctx ssl ssr = do
   dssr <- stDom ssr
   ce ctx [(dssl, dssr)]
 
-stSplitDom :: Ctx -> Type -> Type -> Result (Type, Maybe Type)
-stSplitDom ctx SSEmpty d = ok (SSEmpty, Nothing)
+stSplitDom :: Ctx -> Type -> Type -> Maybe (Type,  Type)
 stSplitDom ctx (SSBind d1 s) d2 = do
   case tEq ctx d1 d2 of 
-    Left _ -> ok (SSBind d1 s, Nothing)
-    Right _ -> ok (SSEmpty, Just s)
+    Left _ -> Nothing
+    Right _ -> Just (SSEmpty, s)
 stSplitDom ctx (SSMerge l r) d = do
-  (t1, b1) <- stSplitDom ctx l d
-  (t2, b2) <- stSplitDom ctx r d
-  ok (case (b1, b2) of 
-    (Nothing, Nothing) -> (SSMerge t1 t2, Nothing)
-    (Just l, _) -> (SSMerge t1 t2, Just l)
-    (_, Just r) -> (SSMerge t1 t2, Just r))
-stSplitDom ctx t d = raise ("[T-Split] expected state to split, got " ++ show t)
+  case (stSplitDom ctx l d, stSplitDom ctx r d) of 
+    (Nothing, Nothing) -> Nothing
+    (Just (re, l), _) -> Just (SSMerge re r, l)
+    (_, Just (re, r)) -> Just (SSMerge l re, r)
+stSplitDom ctx t d = Nothing 
 
 splitSt :: Type -> Result [Proj]
 splitSt SSEmpty = ok []
@@ -48,5 +45,31 @@ splitSt (SSMerge l r) = do
   ok (sl ++ sr)
 splitSt t = raise ("[T-Split] expected state to split, got " ++ show t)
 
-stSplitSt :: Ctx -> Type -> Type -> Result (Type, Maybe Type)
-stSplitSt ctx st1 st2 = ok (EUnit, Just EUnit)
+stSplitApp :: Ctx -> Type -> Type -> Maybe Type
+stSplitApp ctx (TApp fd d) (TApp fd2 d2) = do
+  case tEq ctx fd fd2 of 
+    Left _ -> Nothing
+    Right _ -> case tEq ctx d d2 of
+      Left s -> Nothing
+      Right x0 -> Just SSEmpty 
+stSplitApp ctx (SSMerge l r) d = do
+  case (stSplitApp ctx l d, stSplitApp ctx r d) of 
+    (Nothing, Nothing) -> Nothing
+    (Just s, _) -> Just (SSMerge s r)
+    (_, Just s) -> Just (SSMerge l s)
+stSplitApp ctx t d = Nothing 
+
+stSplitSt :: Ctx -> Type -> Type -> Result Type
+stSplitSt ctx st SSEmpty = ok st
+stSplitSt ctx st (SSBind d s) = case stSplitDom ctx st d of   
+  Nothing -> raise ("[T-Split] could not split " ++ show (SSBind d s) ++ " out of " ++ show st)
+  Just (r, s2) -> do 
+    tEq ctx s s2
+    ok r
+stSplitSt ctx st (SSMerge l r) = do
+  st' <- stSplitSt ctx st l
+  stSplitSt ctx st' r
+stSplitSt ctx st (TApp f a) = case stSplitApp ctx st (TApp f a) of
+  Nothing -> raise ("[T-Split] could not split " ++ show (TApp f a) ++ " out of " ++ show st)
+  Just r -> ok r
+stSplitSt ctx st t = raise ("[T-Split] expected state to split, got " ++ show t)

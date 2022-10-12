@@ -68,10 +68,10 @@ typeE ctx st (App v a) = do
   tv <- typeV ctx v
   case tv of
     EArr st1 t1 ctx1 st2 t2 -> do
-      {- splitte st1 aus st -}
       ta <- typeV ctx a
       tEq ctx t1 ta
-      ok ([], st2, t2)
+      st' <- stSplitSt ctx st st1
+      ok ([], st', t2)
     _ -> raise ("[T-App] expected to apply to function, got " ++ show tv)
 {- T-TApp -}
 typeE ctx st (AApp v t) = do
@@ -112,13 +112,12 @@ typeE ctx st (Send v1 v2) = do
     EChan d1 -> do
       kd1 <- kind ctx d1
       kEq ctx kd1 (KDom SHSingle)
-      sp <- stSplitDom ctx st d1
-      case sp of 
-        (r , Just (SSend x kd2 st1 t1 s)) -> do
+      case stSplitDom ctx st d1 of 
+        Just (r , SSend x kd2 st1 t1 s) -> do
           case kd2 of 
             KDom _ -> do
               kwf ctx kd2
-              {- todo tEq r (subT x ? st1), tEq tv1 (subT x ? t1)-}
+              {- todo -}
               ok ([], SSBind d1 s, EUnit)
             _ -> raise ("[T-Send] can only abstract over domains, got " ++ show kd2)
         _ -> raise ("[T-Send] expected send channel (i.e !s) along a state including their binding, got " ++ show tv1 ++ " and " ++ show st)
@@ -128,29 +127,29 @@ typeE ctx st (Recv v) = do
   tv <- typeV ctx v
   case tv of 
     EChan d1 -> do
-      sp <- stSplitDom ctx st d1
-      case sp of 
-        (r , Just (SRecv x kd2 st1 t1 s)) -> do
+      case stSplitDom ctx st d1 of 
+        Just (r , SRecv x kd2 st1 t1 s) -> do
           kwf ctx kd2
           kd1 <- kind ctx d1
           kEq ctx kd1 (KDom SHSingle)
           ok ([(x, HasKind kd2)], SSMerge r (SSMerge st1 (SSBind d1 s)), t1)
         _ -> raise ("[T-Recv] expected receive channel (i.e ?s) along a state including their binding, got " ++ show tv ++ " and " ++ show st)
-    _ -> raise ("[T-Send] expected channel to receive (i.e ?s) on got along their state binding" ++ show tv ++ " and " ++ show st)
+    _ -> raise ("[T-Send] expected channel to receive on, got " ++ show tv)
 {- T-Fork -}
 typeE ctx st (Fork v) = do 
   tv <- typeV ctx v
   case tv of
-    EArr st1 EUnit ctx2 SSEmpty EUnit -> ok ([], st, EUnit)
+    EArr st1 EUnit ctx2 SSEmpty EUnit -> do
+      st' <- stSplitSt ctx st st1
+      ok ([], st', EUnit)
     _ -> raise ("[T-Fork] expected Process (i.e Unit -> Unit) to fork, got" ++ show tv)
 {- T-Close -}
 typeE ctx st (Close v) = do
   tv <- typeV ctx v
   case tv of
     EChan d1 -> do
-      sp <- stSplitDom ctx st d1
-      case sp of 
-        (r , Just SEnd) -> do
+      case stSplitDom ctx st d1 of 
+        Just (r , SEnd) -> do
           ok ([], r, EUnit)
         _ -> raise ("[T-Close] expected closable channel (i.e End) along their state binding, got " ++ show tv ++ " and " ++ show st)
     _ -> raise ("[T-Close] expected channel to close, got " ++ show tv)
@@ -159,9 +158,8 @@ typeE ctx st (Sel l v) = do
   tv <- typeV ctx v
   case tv of 
     EChan d1 -> do
-      sp <- stSplitDom ctx st d1
-      case sp of 
-        (r , Just (SChoice cl cr)) -> do
+      case stSplitDom ctx st d1 of 
+        Just (r , SChoice cl cr) -> do
           case l of 
             LLeft -> ok ([], SSMerge r (SSBind d1 cl), EUnit)
             LRight -> ok ([], SSMerge r (SSBind d1 cr), EUnit)
@@ -172,9 +170,8 @@ typeE ctx st (Case v e1 e2) = do
   tv <- typeV ctx v
   case tv of 
     (EChan d1) -> do
-      sp <- stSplitDom ctx st d1
-      case sp of
-        (r , Just (SBranch s1 s2)) -> do    
+      case stSplitDom ctx st d1 of
+        Just (r , SBranch s1 s2) -> do    
           tri1 @ (ctxl, stl, tl) <- typeE ctx (SSMerge r (SSBind d1 s1)) e1
           tri2 @ (ctxr, str, tr) <- typeE ctx (SSMerge r (SSBind d1 s2)) e2
           existEq ctx tri1 tri2 
