@@ -6,6 +6,11 @@ import Data.Bifunctor (Bifunctor (bimap))
 import Result
 import Data.Foldable
 import Substitution
+import Constraints 
+import Conversion
+import Control.Monad
+import Data.Either
+import Data.Tuple
 
 type Equiv = (String, String)
 
@@ -29,105 +34,124 @@ kNEq ctx k1 k2 = do
     Left _ -> ok ()
     Right _ -> raise ("[K-Eq] kind " ++ show k1 ++ " cannot be " ++ show k2)
 
-tNf :: Type -> Type
-{- TC-TApp -}
-tNf (TApp (TLam s d t) t') = subT s t' t
-{- TC-Proj -}
-tNf (DProj l (DMerge d d')) = case l of
-  LLeft -> tNf d
-  LRight -> tNf d'
-{- TC-DualVar -}
-tNf (SDual (SDual (TVar i))) = TVar i
-{- TC-DualEnd -}
-tNf (SDual SEnd) = SEnd
-{- TC-DualSend -}
-tNf (SDual (SSend n sh st t s)) = SRecv n sh st t (tNf (SDual s))
-{- TC-DualRecv -}
-tNf (SDual (SRecv n sh st t s)) = SSend n sh st t (tNf  (SDual s))
-{- TC-DualChoice -}
-tNf (SDual (SChoice st st')) = SBranch (tNf (SDual st)) (tNf (SDual st'))
-{- TC-DualBranch -}
-tNf (SDual (SBranch st st')) = SChoice (tNf (SDual st)) (tNf (SDual st'))
-{- recurse -}
-tNf (TLam s d t) = TLam s (tNf d) (tNf t)
-tNf (EAll s k cs t) = EAll s k (map (bimap tNf tNf) cs) (tNf  t)
-tNf (EArr s t ctx' s' t') = EArr (tNf s) (tNf t) ctx' (tNf s') (tNf t')
-tNf (EChan t) = EChan (tNf t)
-tNf (EAcc t) = EAcc (tNf t)
-tNf (EPair t t') = EPair (tNf t) (tNf t')
-tNf (SSend n k s t t') = SSend n k (tNf s) (tNf t) (tNf t')
-tNf (SRecv n k s t t') = SRecv n k (tNf s) (tNf t) (tNf t')
-tNf (SChoice t t') = SChoice (tNf t) (tNf t')
-tNf (SBranch t t') = SBranch (tNf t) (tNf t')
-tNf (SDual t) = SDual (tNf t)
-tNf (DMerge d d') = DMerge (tNf d) (tNf d')
-tNf (SSBind t t') = SSBind (tNf t) (tNf t')
-tNf t = t
-
 tEq :: Ctx -> Type -> Type -> Result ()
-tEq ctx t t' = tEq' ctx [] (tNf t) (tNf t')
+tEq ctx = tEq' ctx []
 
 tEq' :: Ctx -> [Equiv] -> Type -> Type -> Result ()
-tEq' ctx eqs (TVar a) (TVar b) = do 
+tEq' ctx eqs t t' = do
+  l <- tUnify ctx eqs (tNf t) (tNf t')
+  if null l then ok () else raise ("[T-Eq] type mismatch between " ++ show t ++ " and " ++ show t' ++ ", the following variables should be equal: " ++ show l) 
+
+uqsConsistent :: [Equiv] -> Result ()
+uqsConsistent uqs = case ["\n  " ++ x ++ " is required to be both " ++ y ++ " and " ++ y' | 
+        (x, y) <- uqs, (x', y') <- uqs, x == x', y /= y'] of
+    [] -> ok ()
+    xs -> raise ("[T-Unify] fail to compare contexts: " ++ join xs)
+
+tUnify :: Ctx -> [Equiv] -> Type -> Type -> Result [Equiv]
+tUnify ctx eqs (TVar a) (TVar b) = do 
   case (find (\ (x, y) -> x == a && y == b) eqs,
        find (\ (x, y) -> x == b && y == a) eqs) of 
-    (Nothing, Nothing) -> if a /= b then raise ("[T-Eq] variable name mismatch between " ++ a ++ " and " ++ "b") else ok ()
-    _ -> ok ()
-  ok ()
-tEq' ctx eqs (TApp d c) (TApp d' c') = do 
-  tEq' ctx eqs d d'
-  tEq' ctx eqs c c'
-tEq' ctx eqs (TLam s d t)  (TLam s' d' t') = do
-  tEq' ctx eqs d d'
-  tEq' ctx ((s, s') : eqs) t t'
-tEq' ctx eqs (EArr st1 t1 ctx' st1' t1') (EArr st2 t2 ctx'' st2' t2') = do
-  tEq' ctx eqs st1 st2
-  tEq' ctx eqs t1 t2
-  {- ctxEq ctx' ctx'' -}
-  let eqs' = zip (map fst ctx') (map fst ctx'') ++ eqs
-  tEq' ctx eqs'  st1' st2'
-  tEq' ctx eqs'  t1' t2'
-tEq' ctx eqs (EAll s k cs t) (EAll s' k' cs' t') = do
+    (Nothing, Nothing) -> if a /= b then ok [(a, b)] else ok []
+    _ -> ok []
+tUnify ctx eqs (TApp d c) (TApp d' c') = do 
+  d <- tUnify ctx eqs d d' 
+  c <- tUnify ctx eqs c c'
+  ok (d ++ c)
+tUnify ctx eqs (TLam s d t)  (TLam s' d' t') = do
+  d <- tUnify ctx eqs d d'
+  t <- tUnify ctx ((s, s') : eqs) t t'
+  ok (d ++ t)
+tUnify ctx eqs (EArr st1 t1 ctx1 st1' t1') (EArr st2 t2 ctx2 st2' t2') = do
+  st <- tUnify ctx eqs st1 st2
+  t <- tUnify ctx eqs t1 t2
+  eqs' <- existUnify' ctx eqs (ctx1, st1', t1') (ctx2, st2', t2')
+  ok (st ++ t ++ eqs')
+tUnify ctx eqs (EAll s k cs t) (EAll s' k' cs' t') = do
   kEq ctx k k'
   let cs' = renCstrsM eqs cs'
-  {- Gamma, C1 |- C2 und Gamma, C2 |- C1 fordern -}
   ctx' <- cs +-* ctx
-  tEq' ctx' ((s, s') : eqs) t t'
-tEq' ctx eqs (EChan t) (EChan t') = tEq' ctx eqs t t'
-tEq' ctx eqs (EAcc t) (EAcc t') = tEq' ctx eqs t t'
-tEq' ctx eqs EUnit EUnit = ok ()
-tEq' ctx eqs (SSend n k s t c) (SSend n' k' s' t' c') = do
+  ce ctx' cs'
+  ctx'' <- cs' +-* ctx
+  ce ctx'' cs
+  tUnify ctx' ((s, s') : eqs) t t'
+tUnify ctx eqs (EChan t) (EChan t') = tUnify ctx eqs t t'
+tUnify ctx eqs (EAcc t) (EAcc t') = tUnify ctx eqs t t'
+tUnify ctx eqs EUnit EUnit = ok []
+tUnify ctx eqs (SSend n k s t c) (SSend n' k' s' t' c') = do
   kEq ctx k k' 
-  tEq' ctx ((n, n') : eqs) s s' 
-  tEq' ctx ((n, n') : eqs) t t'
-  tEq' ctx eqs c c'
-tEq' ctx eqs (SRecv n k s t c) (SRecv n' k' s' t' c') = do
+  s <- tUnify ctx ((n, n') : eqs) s s' 
+  t <- tUnify ctx ((n, n') : eqs) t t'
+  c <- tUnify ctx eqs c c'
+  ok (s ++ t ++ c)
+tUnify ctx eqs (SRecv n k s t c) (SRecv n' k' s' t' c') = do
   kEq ctx k k' 
-  tEq' ctx ((n, n') : eqs) s s' 
-  tEq' ctx ((n, n') : eqs) t t'
-  tEq' ctx eqs c c'  
-tEq' ctx eqs (SChoice l r) (SChoice l' r') = do
-  tEq' ctx eqs l l'
-  tEq' ctx eqs r r'
-tEq' ctx eqs (SBranch l r) (SBranch l' r') = do
-  tEq' ctx eqs l l'
-  tEq' ctx eqs r r'
-tEq' ctx eqs SEnd SEnd = ok ()
-tEq' ctx eqs (SDual t) (SDual t') = unreachable
-tEq' ctx eqs SHEmpty SHEmpty = ok ()
-tEq' ctx eqs (SHDisjoint l r) (SHDisjoint l' r') = do
-  tEq' ctx eqs l l'
-  tEq' ctx eqs r r'
-tEq' ctx eqs DEmpty DEmpty = ok ()
-tEq' ctx eqs (DMerge l r) (DMerge l' r') = do
-  tEq' ctx eqs l l'
-  tEq' ctx eqs r r'
-tEq' ctx eqs (DProj l t) (DProj l' t') = unreachable
-tEq' ctx eqs SSEmpty SSEmpty  = ok ()
-tEq' ctx eqs (SSBind d t) (SSBind d' t') = do
-  tEq' ctx eqs d d'
-  tEq' ctx eqs t t'
-tEq' ctx eqs (SSMerge l r) (SSMerge l' r') = do
-  tEq' ctx eqs l l'
-  tEq' ctx eqs r r'
-tEq' ctx eqs a b = raise ("[T-Eq] type mismatch between " ++ show a ++ " and " ++ show b)   
+  s <- tUnify ctx ((n, n') : eqs) s s' 
+  t <- tUnify ctx ((n, n') : eqs) t t'
+  c <- tUnify ctx eqs c c'
+  ok (s ++ t ++ c)
+tUnify ctx eqs (SChoice l r) (SChoice l' r') = do
+  l <- tUnify ctx eqs l l'
+  r <- tUnify ctx eqs r r'
+  ok (l ++ r)
+tUnify ctx eqs (SBranch l r) (SBranch l' r') = do
+  l <- tUnify ctx eqs l l'
+  r <- tUnify ctx eqs r r'
+  ok (l ++ r)
+tUnify ctx eqs SEnd SEnd = ok []
+tUnify ctx eqs (SDual t) (SDual t') = unreachable
+tUnify ctx eqs SHEmpty SHEmpty = ok []
+tUnify ctx eqs (SHDisjoint l r) (SHDisjoint l' r') = do
+  l <- tUnify ctx eqs l l'
+  r <- tUnify ctx eqs r r'
+  ok (l ++ r)
+tUnify ctx eqs DEmpty DEmpty = ok []
+tUnify ctx eqs (DMerge l r) (DMerge l' r') = do
+  l <- tUnify ctx eqs l l'
+  r <- tUnify ctx eqs r r'
+  ok (l ++ r)
+tUnify ctx eqs (DProj l t) (DProj l' t') = unreachable
+tUnify ctx eqs SSEmpty SSEmpty  = ok []
+tUnify ctx eqs (SSBind d t) (SSBind d' t') = do
+  d <- tUnify ctx eqs d d'
+  t <- tUnify ctx eqs t t'
+  ok (d ++ t)
+tUnify ctx eqs (SSMerge l r) (SSMerge l' r') = do
+  l <- tUnify ctx eqs l l'
+  r <- tUnify ctx eqs r r'
+  ok (l ++ r)
+tUnify ctx eqs a b = raise ("[T-Unify] could not unify " ++ show a ++ " and " ++ show b)
+
+{- dom binding ctxs only  -}
+ctxUnify' :: [Equiv] -> [Equiv] -> Ctx -> Ctx -> Ctx -> Result [Equiv]
+ctxUnify' eqs uqs ctx ctx1 ctx2 = do
+  let f ctx1 ctx2 uqs = case filter isLeft [case find (\(x', y') -> x == x') uqs of 
+                               Nothing -> do 
+                                t' <- x .? ctx2
+                                tEq' ctx eqs t t' 
+                               Just (_, y) -> do
+                                t' <- y .? ctx2
+                                tEq' ctx eqs t t'                 
+                            | (x, HasType t) <- ctx1] of 
+                          [] -> ok ()
+                          xs -> raise ("[T-Unify] fail to compare contexts: " ++ join ["\n  " ++ s | (Left s) <- xs])
+  f ctx1 ctx2 uqs
+  f ctx2 ctx1 (map swap uqs)
+  ok [ (x , y) | (x , y) <- uqs, x `notElem` map fst ctx1 ]
+
+{- unification for ∃Γ.Σ;T -}
+existEq :: Ctx -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result ()
+existEq ctx = existEq' ctx []
+
+existEq' :: Ctx -> [Equiv] -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result ()
+existEq' ctx eqs tri1 tri2 = do
+  l <- existUnify' ctx eqs tri1 tri2
+  if null l then ok () else raise ("[T-Eq] type mismatch between " ++ show tri1 ++ " and " ++ show tri2 ++ ", the following variables should be equal: " ++ show l)
+
+existUnify' :: Ctx -> [Equiv] -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result [Equiv]
+existUnify' ctx eqs (ctx1, st1, t1) (ctx2, st2, t2) = do
+  st' <- tUnify ctx eqs st1 st2
+  t' <- tUnify ctx eqs t1 t2
+  let uqs = st' ++ t'
+  uqsConsistent uqs
+  ctxUnify' eqs uqs ctx ctx1 ctx2

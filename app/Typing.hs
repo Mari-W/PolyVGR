@@ -1,12 +1,14 @@
 module Typing where
 
 import Ast
+import Constraints
 import Context
-import Result
+import Conversion
 import Equality
 import Kinding
-import Substitution
+import Result
 import State
+import Substitution
 
 typeV :: Ctx -> Val -> Result Type
 {- T-Var -}
@@ -78,7 +80,7 @@ typeE ctx st (AApp v t) = do
     EAll s k cs c -> do
       kt <- kind ctx t
       kEq ctx kt k
-      {- todo Γ ⊢ {𝑇 ′/𝛼 }C -}
+      ce ctx (subCstrs s t cs)
       ok ([], st, tNf (subT s t c))
     _ -> raise ("[T-TApp] expected to apply to forall abstraction, got " ++ show tv)
 {- T-New -}
@@ -110,7 +112,7 @@ typeE ctx st (Send v1 v2) = do
     EChan d1 -> do
       kd1 <- kind ctx d1
       kEq ctx kd1 (KDom SHSingle)
-      sp <- stSplit ctx st d1
+      sp <- stSplitDom ctx st d1
       case sp of 
         (r , Just (SSend x kd2 st1 t1 s)) -> do
           case kd2 of 
@@ -126,7 +128,7 @@ typeE ctx st (Recv v) = do
   tv <- typeV ctx v
   case tv of 
     EChan d1 -> do
-      sp <- stSplit ctx st d1
+      sp <- stSplitDom ctx st d1
       case sp of 
         (r , Just (SRecv x kd2 st1 t1 s)) -> do
           kwf ctx kd2
@@ -146,7 +148,7 @@ typeE ctx st (Close v) = do
   tv <- typeV ctx v
   case tv of
     EChan d1 -> do
-      sp <- stSplit ctx st d1
+      sp <- stSplitDom ctx st d1
       case sp of 
         (r , Just SEnd) -> do
           ok ([], r, EUnit)
@@ -157,7 +159,7 @@ typeE ctx st (Sel l v) = do
   tv <- typeV ctx v
   case tv of 
     EChan d1 -> do
-      sp <- stSplit ctx st d1
+      sp <- stSplitDom ctx st d1
       case sp of 
         (r , Just (SChoice cl cr)) -> do
           case l of 
@@ -170,14 +172,12 @@ typeE ctx st (Case v e1 e2) = do
   tv <- typeV ctx v
   case tv of 
     (EChan d1) -> do
-      sp <- stSplit ctx st d1
+      sp <- stSplitDom ctx st d1
       case sp of
         (r , Just (SBranch s1 s2)) -> do    
-          (ctxl, stl, tl) <- typeE ctx (SSMerge r (SSBind d1 s1)) e1
-          (ctxr, str, tr) <- typeE ctx (SSMerge r (SSBind d1 s2)) e2
-          {- ctxEq ctxr ctxl ? -}
-          tEq ctx stl str
-          tEq ctx tl tr
+          tri1 @ (ctxl, stl, tl) <- typeE ctx (SSMerge r (SSBind d1 s1)) e1
+          tri2 @ (ctxr, str, tr) <- typeE ctx (SSMerge r (SSBind d1 s2)) e2
+          existEq ctx tri1 tri2 
           ok (ctxl, stl, tl)
         _ -> raise ("[T-Select] expected branched channel (i.e s & s') along a state including their binding, got " ++ show tv ++ " and " ++ show st)
     _ -> raise ("[T-Select] expected channel to case split on got " ++ show tv)

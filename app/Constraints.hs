@@ -3,18 +3,9 @@ module Constraints where
 import Ast
 import Result
 import Context
-import Equality
+import Conversion
 import Data.List
 
-stateDom :: Type -> Result Type
-stateDom SSEmpty = ok DEmpty 
-stateDom (SSBind d s) = ok d 
-stateDom (TApp _ d) = ok d 
-stateDom (SSMerge l r) = do
-  dl <- stateDom l
-  dr <- stateDom r
-  ok (DMerge dl dr)
-stateDom t = raise ("[CE] expected state to extract dom of, got " ++ show t)
 
 splitDom :: Type -> Result [Type]
 splitDom DEmpty = ok []
@@ -75,9 +66,3 @@ ce ctx cs = do
   assm <- fixExtCstrs <$> splitCstrs (filterCstrs ctx)
   cstrs <- splitCstrs cs
   searchCstrs assm cstrs
-
-statesDisjunct :: Ctx -> Type -> Type -> Result ()
-statesDisjunct ctx ssl ssr = do
-  dssl <- stateDom ssl
-  dssr <- stateDom ssr
-  ce ctx [(dssl, dssr)]

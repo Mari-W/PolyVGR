@@ -5,6 +5,7 @@ import Context
 import Equality
 import Result
 import Constraints
+import State
 
 kwf :: Ctx -> Kind -> Result ()
 kwf ctx KType = ok ()
@@ -75,7 +76,7 @@ kind ctx (EAll s k cs t) = do
   ok KType 
 {- K-Arr -}
 kind ctx (EArr s1 t1 ctx2 s2 t2) = do
-  domOnly ctx2
+  isDomCtx ctx2
   ks1 <- kind ctx s1
   kEq ctx ks1 KState 
   kt1 <- kind ctx t1
@@ -212,7 +213,7 @@ kind ctx (SSBind d s) = do
     _ -> raise ("[K-StChan] expected single domain, got " ++ show d)
 {- K-StMerge -}
 kind ctx (SSMerge ssl ssr) = do
-  statesDisjunct ctx ssl ssr
+  stDisj ctx ssl ssr
   kssl <- kind ctx ssl
   kEq ctx kssl KState
   kssr <- kind ctx ssr

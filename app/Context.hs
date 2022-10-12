@@ -27,17 +27,17 @@ c +- ctx = do
   xs +-* ctx'
 
 (*?) :: String -> Ctx -> Result Kind
-s *? ctx = case find (\(s', _) -> s' == s) ctx of
+s *? ctx = case find (\(s', _) -> s' == s) (rev ctx) of
   Just (_, HasKind k) -> ok k
   _ -> raise ("[CTX] could not resolve kind " ++ s ++ " in " ++ show ctx)
 
 (.?) :: String -> Ctx -> Result Type
-s .? ctx = case find (\(s', _) -> s' == s) ctx of
+s .? ctx = case find (\(s', _) -> s' == s) (rev ctx) of
   Just (_, HasType t) -> ok t
   _ -> raise ("[CTX] could not resolve type " ++ s ++ " in " ++ show ctx)
 
 (?!) :: String -> Ctx -> Result ()
-s ?! ctx = case find (\(s', _) -> s' == s) ctx of
+s ?! ctx = case find (\(s', _) -> s' == s) (rev ctx) of
   Just _ -> raise ("[CTX] variable " ++ s ++ " already defined")
   _ -> ok ()
 
@@ -47,10 +47,10 @@ freshVar = take 32 $ randomRs ('a','z') $ unsafePerformIO newStdGen
 rev :: Ctx -> Ctx
 rev = foldl (flip (:)) []
 
-domOnly :: Ctx -> Result ()
-domOnly [] = ok ()
-domOnly (x : xs) = case x of  
-  (_, HasKind (KDom _)) -> domOnly xs 
+isDomCtx :: Ctx -> Result ()
+isDomCtx [] = ok ()
+isDomCtx (x : xs) = case x of  
+  (_, HasKind (KDom _)) -> isDomCtx xs 
   _ -> raise ("[CTX] found non domain " ++ show x ++ " in ctx")
 
 gd :: Ctx -> Ctx
