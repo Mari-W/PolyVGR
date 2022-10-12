@@ -101,6 +101,9 @@ renCtx x1 x2 = subCtx x1 (TVar x2)
 renK :: String -> String -> Kind -> Kind
 renK x1 x2 = subK x1 (TVar x2)
  
+renTM :: [(String, String)] -> Type -> Type
+renTM xs = subTM (map (second TVar) xs)
+
 renT :: String -> String -> Type -> Type
 renT x1 x2 = subT x1 (TVar x2)
 
@@ -109,7 +112,6 @@ renE x1 x2 = subE x1 (VVar x2)
 
 renV :: String -> String -> Val -> Val
 renV x1 x2 = subV x1 (VVar x2)
-
 
 subCstrs :: String -> Type -> [Cstr] -> [Cstr]
 subCstrs x s = map (bimap (subT x s) (subT x s))
@@ -132,6 +134,10 @@ subK :: String -> Type -> Kind -> Kind
 subK x s (KDom t) = KDom (subT x s t)
 subK x s (KLam l r) = KLam (subK x s l) (subK x s r)
 subK x s k = k
+
+subTM :: [(String, Type)] -> Type -> Type
+subTM [] t = t
+subTM ((x, s) : xs) t = subTM xs (subT x s t)
 
 subT :: String -> Type -> Type -> Type
 subT x s (TVar x2) = if x == x2 then s else TVar x2

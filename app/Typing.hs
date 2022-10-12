@@ -115,10 +115,13 @@ typeE ctx st (Send v1 v2) = do
       case stSplitDom ctx st d1 of 
         Just (r , SSend x kd2 st1 t1 s) -> do
           case kd2 of 
-            KDom _ -> do
-              kwf ctx kd2
-              {- todo -}
-              ok ([], SSBind d1 s, EUnit)
+            KDom sh -> do
+              ksh <- kind ctx sh
+              kEq ctx ksh KShape
+              u <- tUnify ctx [] tv1 t1
+              let st1' = renTM u st1
+              st' <- stSplitSt ctx r st1'
+              ok ([], SSMerge st' (SSBind d1 s), EUnit)
             _ -> raise ("[T-Send] can only abstract over domains, got " ++ show kd2)
         _ -> raise ("[T-Send] expected send channel (i.e !s) along a state including their binding, got " ++ show tv1 ++ " and " ++ show st)
     _ -> raise ("[T-Send] expected channel to send on got " ++ show tv2)
