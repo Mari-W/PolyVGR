@@ -2,6 +2,7 @@ module Main where
 
 import Ast
 import Kinding
+import Typing
 
 t1 = EAll "c" (KDom SHSingle) [] (
       EAll "s" KSession [] (
@@ -69,7 +70,19 @@ t3 = EAll "n" KShape [] (
       )
     ) 
 
+v11 = VTAbs "c" (KDom SHSingle) [] (
+        VTAbs "s" KSession [] (
+          VAbs SSEmpty  "x" EUnit (
+            Val (VAbs (SSBind (TVar "c") (
+              SSend "a" (KDom SHEmpty) SSEmpty EUnit (TVar "s")
+            )) "y" (EChan (TVar "c")) (
+              Send (VVar "x") (VVar "y")
+            ))
+          )
+        )
+      )
+
 main :: IO ()
-main = case kind [] t2 of   
+main = case typeV [] v11 of   
   Left s -> putStrLn s
   Right ki -> print ki

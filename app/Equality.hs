@@ -101,6 +101,7 @@ tUnify ctx eqs (SBranch l r) (SBranch l' r') = do
 tUnify ctx eqs SEnd SEnd = ok []
 tUnify ctx eqs (SDual t) (SDual t') = unreachable
 tUnify ctx eqs SHEmpty SHEmpty = ok []
+tUnify ctx eqs SHSingle SHSingle = ok []
 tUnify ctx eqs (SHDisjoint l r) (SHDisjoint l' r') = do
   l <- tUnify ctx eqs l l'
   r <- tUnify ctx eqs r r'
