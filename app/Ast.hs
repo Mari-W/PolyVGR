@@ -12,7 +12,7 @@ data Kind
 data Type
   = TVar String
   | TApp Type Type
-  | TLam String Type Type
+  | TLam String Kind Type 
   | EAll String Kind [Cstr] Type
   | EArr Type Type Ctx Type Type
   | EChan Type
@@ -27,7 +27,7 @@ data Type
   | SDual Type
   | SHEmpty
   | SHSingle
-  | SHDisjoint Type Type
+  | SHMerge Type Type
   | DEmpty
   | DMerge Type Type
   | DProj Label Type

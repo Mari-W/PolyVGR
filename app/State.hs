@@ -5,6 +5,7 @@ import Ast
 import Result
 import Equality 
 import Constraints
+import Pretty
 
 type Proj = (Type, Type)
 
@@ -16,7 +17,7 @@ stDom (SSMerge l r) = do
   dl <- stDom l
   dr <- stDom r
   ok (DMerge dl dr)
-stDom t = raise ("[CE] expected state to extract dom of, got " ++ show t)
+stDom t = raise ("[CE] expected state to extract dom of, got " ++ pretty t)
 
 stDisj :: Ctx -> Type -> Type -> Result ()
 stDisj ctx ssl ssr = do
@@ -43,7 +44,7 @@ splitSt (SSMerge l r) = do
   sl <- splitSt l
   sr <- splitSt r
   ok (sl ++ sr)
-splitSt t = raise ("[T-Split] expected state to split, got " ++ show t)
+splitSt t = raise ("[T-Split] expected state to split, got " ++ pretty t)
 
 stSplitApp :: Ctx -> Type -> Type -> Maybe Type
 stSplitApp ctx (TApp fd d) (TApp fd2 d2) = do
@@ -62,7 +63,7 @@ stSplitApp ctx t d = Nothing
 stSplitSt :: Ctx -> Type -> Type -> Result Type
 stSplitSt ctx st SSEmpty = ok st
 stSplitSt ctx st (SSBind d s) = case stSplitDom ctx st d of   
-  Nothing -> raise ("[T-Split] could not split " ++ show (SSBind d s) ++ " out of " ++ show st)
+  Nothing -> raise ("[T-Split] could not split " ++ pretty (SSBind d s) ++ " out of " ++ pretty st)
   Just (r, s2) -> do 
     tEq ctx s s2
     ok r
@@ -70,6 +71,6 @@ stSplitSt ctx st (SSMerge l r) = do
   st' <- stSplitSt ctx st l
   stSplitSt ctx st' r
 stSplitSt ctx st (TApp f a) = case stSplitApp ctx st (TApp f a) of
-  Nothing -> raise ("[T-Split] could not split " ++ show (TApp f a) ++ " out of " ++ show st)
+  Nothing -> raise ("[T-Split] could not split " ++ pretty (TApp f a) ++ " out of " ++ pretty st)
   Just r -> ok r
-stSplitSt ctx st t = raise ("[T-Split] expected state to split, got " ++ show t)
+stSplitSt ctx st t = raise ("[T-Split] expected state to split, got " ++ pretty t)

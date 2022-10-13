@@ -11,6 +11,7 @@ import Conversion
 import Control.Monad
 import Data.Either
 import Data.Tuple
+import Pretty
 
 type Equiv = (String, String)
 
@@ -23,7 +24,7 @@ kEq ctx (KDom t1) (KDom t2) = tEq ctx t1 t2
 kEq ctx (KLam d1 c1) (KLam d2 c2) = do
   kEq ctx d1 d2
   kEq ctx c1 c2
-kEq ctx k1 k2 = raise ("[K-Eq] kind mismatch between " ++ show k1 ++ " and " ++ show k2)
+kEq ctx k1 k2 = raise ("[K-Eq] kind mismatch between " ++ pretty k1 ++ " and " ++ pretty k2)
 
 kEqs :: Ctx -> Kind -> [Kind] -> Result ()
 kEqs ctx ks = mapM_ (kEq ctx ks)
@@ -32,7 +33,7 @@ kNEq :: Ctx -> Kind -> Kind -> Result ()
 kNEq ctx k1 k2 = do
   case kEq ctx k1 k2 of 
     Left _ -> ok ()
-    Right _ -> raise ("[K-Eq] kind " ++ show k1 ++ " cannot be " ++ show k2)
+    Right _ -> raise ("[K-Eq] kind " ++ pretty k1 ++ " cannot be " ++ pretty k2)
 
 tEq :: Ctx -> Type -> Type -> Result ()
 tEq ctx = tEq' ctx []
@@ -40,7 +41,7 @@ tEq ctx = tEq' ctx []
 tEq' :: Ctx -> [Equiv] -> Type -> Type -> Result ()
 tEq' ctx eqs t t' = do
   l <- tUnify ctx eqs (tNf t) (tNf t')
-  if null l then ok () else raise ("[T-Eq] type mismatch between " ++ show t ++ " and " ++ show t' ++ ", the following variables should be equal: " ++ show l) 
+  if null l then ok () else raise ("[T-Eq] type mismatch between " ++ pretty t ++ " and " ++ pretty t' ++ ", the following variables should be equal: " ++ show l) 
 
 uqsConsistent :: [Equiv] -> Result ()
 uqsConsistent uqs = case ["\n  " ++ x ++ " is required to be both " ++ y ++ " and " ++ y' | 
@@ -58,10 +59,9 @@ tUnify ctx eqs (TApp d c) (TApp d' c') = do
   d <- tUnify ctx eqs d d' 
   c <- tUnify ctx eqs c c'
   ok (d ++ c)
-tUnify ctx eqs (TLam s d t)  (TLam s' d' t') = do
-  d <- tUnify ctx eqs d d'
-  t <- tUnify ctx ((s, s') : eqs) t t'
-  ok (d ++ t)
+tUnify ctx eqs (TLam s k t)  (TLam s' k' t') = do
+  kEq ctx k k'
+  tUnify ctx ((s, s') : eqs) t t'
 tUnify ctx eqs (EArr st1 t1 ctx1 st1' t1') (EArr st2 t2 ctx2 st2' t2') = do
   st <- tUnify ctx eqs st1 st2
   t <- tUnify ctx eqs t1 t2
@@ -102,7 +102,7 @@ tUnify ctx eqs SEnd SEnd = ok []
 tUnify ctx eqs (SDual t) (SDual t') = unreachable
 tUnify ctx eqs SHEmpty SHEmpty = ok []
 tUnify ctx eqs SHSingle SHSingle = ok []
-tUnify ctx eqs (SHDisjoint l r) (SHDisjoint l' r') = do
+tUnify ctx eqs (SHMerge l r) (SHMerge l' r') = do
   l <- tUnify ctx eqs l l'
   r <- tUnify ctx eqs r r'
   ok (l ++ r)
@@ -121,7 +121,7 @@ tUnify ctx eqs (SSMerge l r) (SSMerge l' r') = do
   l <- tUnify ctx eqs l l'
   r <- tUnify ctx eqs r r'
   ok (l ++ r)
-tUnify ctx eqs a b = raise ("[T-Unify] could not unify " ++ show a ++ " and " ++ show b)
+tUnify ctx eqs a b = raise ("[T-Unify] could not unify " ++ pretty a ++ " and " ++ pretty b)
 
 ctxUnifyH :: [Equiv] ->  [Equiv] -> Ctx -> Ctx -> Ctx -> Result [Result ()]
 ctxUnifyH eqs uqs ctx [] ctx2 = ok [] 
@@ -154,7 +154,7 @@ existEq ctx = existEq' ctx []
 existEq' :: Ctx -> [Equiv] -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result ()
 existEq' ctx eqs tri1 tri2 = do
   l <- existUnify' ctx eqs tri1 tri2
-  if null l then ok () else raise ("[T-Eq] type mismatch between " ++ show tri1 ++ " and " ++ show tri2 ++ ", the following variables should be equal: " ++ show l)
+  if null l then ok () else raise ("[T-Eq] type mismatch between " ++ pretty tri1 ++ " and " ++ pretty tri2 ++ ", the following variables should be equal: " ++ show l)
 
 existUnify' :: Ctx -> [Equiv] -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result [Equiv]
 existUnify' ctx eqs (ctx1, st1, t1) (ctx2, st2, t2) = do

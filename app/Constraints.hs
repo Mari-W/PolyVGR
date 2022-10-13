@@ -5,7 +5,7 @@ import Result
 import Context
 import Conversion
 import Data.List
-
+import Pretty 
 
 splitDom :: Type -> Result [Type]
 splitDom DEmpty = ok []
@@ -15,7 +15,7 @@ splitDom (DMerge d d') = do
   ok (xs ++ ys)
 splitDom (DProj l d) = ok [DProj l d]
 splitDom (TVar x) = ok [TVar x]
-splitDom t = raise ("[CE] expected state to extract dom of, got " ++ show t)
+splitDom t = raise ("[CE] expected state to extract dom of, got " ++ pretty t)
 
 splitCstr :: Cstr -> Result [Cstr]
 splitCstr (a, b) = do

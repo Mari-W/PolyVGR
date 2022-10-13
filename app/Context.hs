@@ -6,6 +6,7 @@ import Result ( ok, raise, Result )
 import Data.List (tails)
 import System.Random
 import System.IO.Unsafe
+import Pretty
 
 (+*) :: (String, Kind) -> Ctx -> Result Ctx
 (s, k) +* ctx = do
@@ -29,12 +30,12 @@ c +- ctx = do
 (*?) :: String -> Ctx -> Result Kind
 s *? ctx = case find (\(s', _) -> s' == s) (rev ctx) of
   Just (_, HasKind k) -> ok k
-  _ -> raise ("[CTX] could not resolve kind " ++ s ++ " in " ++ show ctx)
+  _ -> raise ("[CTX] could not resolve kind " ++ s ++ " in " ++ pretty ctx)
 
 (.?) :: String -> Ctx -> Result Type
 s .? ctx = case find (\(s', _) -> s' == s) (rev ctx) of
   Just (_, HasType t) -> ok t
-  _ -> raise ("[CTX] could not resolve type " ++ s ++ " in " ++ show ctx)
+  _ -> raise ("[CTX] could not resolve type " ++ s ++ " in " ++ pretty ctx)
 
 (?!) :: String -> Ctx -> Result ()
 s ?! ctx = case find (\(s', _) -> s' == s) (rev ctx) of
@@ -51,7 +52,7 @@ isDomCtx :: Ctx -> Result ()
 isDomCtx [] = ok ()
 isDomCtx (x : xs) = case x of  
   (_, HasKind (KDom _)) -> isDomCtx xs 
-  _ -> raise ("[CTX] found non domain " ++ show x ++ " in ctx")
+  _ -> raise ("[CTX] found non domain " ++ pretty x ++ " in ctx")
 
 gd :: Ctx -> Ctx
 gd [] = []

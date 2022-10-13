@@ -53,7 +53,7 @@ freeT bs SEnd = []
 freeT bs (SDual t) = freeT bs t
 freeT bs SHEmpty = [] 
 freeT bs SHSingle = []
-freeT bs (SHDisjoint l r) = freeT bs l ++ freeT bs r
+freeT bs (SHMerge l r) = freeT bs l ++ freeT bs r
 freeT bs DEmpty = [] 
 freeT bs (DProj l t) = freeT bs t
 freeT bs (DMerge l r) = freeT bs l ++ freeT bs r
@@ -142,13 +142,13 @@ subTM ((x, s) : xs) t = subTM xs (subT x s t)
 subT :: String -> Type -> Type -> Type
 subT x s (TVar x2) = if x == x2 then s else TVar x2
 subT x s (TApp f a) = TApp (subT x s f) (subT x s a)
-subT x s (TLam x2 d b) = do
-  if x == x2 then TLam x2 (subT x s d) b else 
+subT x s (TLam x2 k b) = do
+  if x == x2 then TLam x2 (subK x s k) b else 
     case find (== x2) (freeT [] s) of
-      Nothing -> TLam x2 (subT x s d) (subT x s b)
+      Nothing -> TLam x2 (subK x s k) (subT x s b)
       Just _ -> do
         let v = freshVar
-        TLam v (subT x s d) (subT x s (renT x2 v b))
+        TLam v (subK x s k) (subT x s (renT x2 v b))
 subT x s (EAll x2 k cs t) = do
   if x == x2 then EAll x2 (subK x s k) cs t else
     case find (== x2) (freeT [] s) of
@@ -181,7 +181,7 @@ subT x s SEnd = SEnd
 subT x s (SDual t) = SDual (subT x s t)
 subT x s SHEmpty = SHEmpty 
 subT x s SHSingle = SHSingle
-subT x s (SHDisjoint l r) = SHDisjoint (subT x s l) (subT x s r)
+subT x s (SHMerge l r) = SHMerge (subT x s l) (subT x s r)
 subT x s DEmpty = DEmpty 
 subT x s (DProj l t) = DProj l (subT x s t)
 subT x s (DMerge l r) = DMerge (subT x s l) (subT x s r)

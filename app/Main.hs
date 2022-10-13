@@ -3,6 +3,7 @@ module Main where
 import Ast
 import Kinding
 import Typing
+import Pretty 
 
 t1 = EAll "c" (KDom SHSingle) [] (
       EAll "s" KSession [] (
@@ -17,8 +18,8 @@ t2 = EAll "n1" KShape [] (
       EAll "ss1" (KLam (KDom (TVar "n1")) KState) [] (
         EAll "n2" KShape [] (
           EAll "n" KShape [] (
-            EAll "ss2" (KLam (KDom (SHDisjoint (TVar "n") (TVar "n2"))) KState) [] (
-              EAll "t2" (KLam (KDom (SHDisjoint (TVar "n") (TVar "n2"))) KType) [] (
+            EAll "ss2" (KLam (KDom (SHMerge (TVar "n") (TVar "n2"))) KState) [] (
+              EAll "t2" (KLam (KDom (SHMerge (TVar "n") (TVar "n2"))) KType) [] (
                 EAll "a1" (KDom (TVar "n1")) [] (
                   EAll "a2" (KDom  (TVar "n2")) [] (
                     EAll "g" (KDom SHSingle) [(TVar  "a1", TVar "g"), (TVar  "a2", TVar "g")] (
@@ -70,7 +71,7 @@ t3 = EAll "n" KShape [] (
       )
     ) 
 
-v11 = VTAbs "c" (KDom SHSingle) [] (
+v11 = VTAbs "c" (KDom SHEmpty) [] (
         VTAbs "s" KSession [] (
           VAbs SSEmpty  "x" EUnit (
             Val (VAbs (SSBind (TVar "c") (
@@ -84,5 +85,5 @@ v11 = VTAbs "c" (KDom SHSingle) [] (
 
 main :: IO ()
 main = case typeV' [] v11 of   
-  Left s -> putStrLn $ "type error: " ++ s
-  Right ki -> print ki
+  Left s -> putStrLn $ "TYPE ERROR\n" ++ s
+  Right ki -> putStrLn (pretty ki)

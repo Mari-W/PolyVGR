@@ -10,10 +10,11 @@ import Result
 import State
 import Substitution
 import Debug.Trace
+import Pretty
 
 typeV' ctx v = case typeV ctx v of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    type of " ++ show v ++ "\n         in " ++ show ctx
+  Left err -> Left $ err ++ "\n    type of " ++ pretty v ++ "\n         in [" ++ pretty ctx ++ "]"
 
 
 typeV :: Ctx -> Val -> Result Type
@@ -42,7 +43,7 @@ typeV ctx (VChan d) = do
   d' <- kind' ctx d
   case d' of
     KDom SHSingle -> ok (EChan d)
-    _ -> raise ("[T-Chan] expected single domain, got " ++ show d')
+    _ -> raise ("[T-Chan] expected single domain, got " ++ pretty d')
 {- T-Abs -}
 typeV ctx (VAbs st s t e) = do
   ctx' <- (s, t) +. ctx
@@ -54,7 +55,7 @@ typeV ctx (VAbs st s t e) = do
 
 typeE' ctx st e = case typeE ctx st e of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    type of " ++ show e ++ "\n         in " ++ show ctx
+  Left err -> Left $ err ++ "\n    type of " ++ pretty e ++ "\n         in [" ++ pretty ctx ++ "]"
 
 typeE :: Ctx -> Type -> Expr -> Result (Ctx, Type, Type)
 {- T-Let -}
@@ -75,7 +76,7 @@ typeE ctx st (Proj l v) = do
   case (l, tv) of       
     (LLeft, EPair t _) -> ok ([], st, t)
     (LRight, EPair _ t) -> ok ([], st, t)
-    _ -> raise ("[T-Proj] expected to project out of pair, got " ++ show tv)
+    _ -> raise ("[T-Proj] expected to project out of pair, got " ++ pretty tv)
 {- T-App -}
 typeE ctx st (App v a) = do
   tv <- typeV' ctx v
@@ -85,7 +86,7 @@ typeE ctx st (App v a) = do
       tEq ctx t1 ta
       st' <- stSplitSt ctx st st1
       ok ([], st', t2)
-    _ -> raise ("[T-App] expected to apply to function, got " ++ show tv)
+    _ -> raise ("[T-App] expected to apply to function, got " ++ pretty tv)
 {- T-TApp -}
 typeE ctx st (AApp v t) = do
   tv <- typeV' ctx v
@@ -95,7 +96,7 @@ typeE ctx st (AApp v t) = do
       kEq ctx kt k
       ce ctx (subCstrs s t cs)
       ok ([], st, tNf (subT s t c))
-    _ -> raise ("[T-TApp] expected to apply to forall abstraction, got " ++ show tv)
+    _ -> raise ("[T-TApp] expected to apply to forall abstraction, got " ++ pretty tv)
 {- T-New -}
 typeE ctx st (New t) = do
   kt <- kind' ctx t
@@ -108,7 +109,7 @@ typeE ctx st (Req v) = do
     EAcc t -> do
       let x = freshVar
       ok ([(x, HasKind (KDom SHSingle))], SSMerge st (SSBind (TVar x) t), EChan (TVar x))
-    _ -> raise ("[T-Request] expected access point to request to, got " ++ show tv)
+    _ -> raise ("[T-Request] expected access point to request to, got " ++ pretty tv)
 {- T-Accept -}
 typeE ctx st (Acc v) = do
   tv <- typeV' ctx v
@@ -116,7 +117,7 @@ typeE ctx st (Acc v) = do
     EAcc t -> do
       let x = freshVar
       ok ([(x, HasKind (KDom SHSingle))], SSMerge st (SSBind (TVar x) (SDual t)), EChan (TVar x))
-    _ -> raise ("[T-Accept] expected access point to request to, got " ++ show tv)
+    _ -> raise ("[T-Accept] expected access point to request to, got " ++ pretty tv)
 {- T-Send -}
 typeE ctx st (Send v1 v2) = do 
   tv1 <- typeV' ctx v1
@@ -135,9 +136,9 @@ typeE ctx st (Send v1 v2) = do
               let st1' = renTM u st1
               st' <- stSplitSt ctx r st1'
               ok ([], SSMerge st' (SSBind d1 s), EUnit)
-            _ -> raise ("[T-Send] can only abstract over domains, got " ++ show kd2)
-        _ -> raise ("[T-Send] expected send channel (i.e !s) along a state including their binding, got " ++ show tv1 ++ " and " ++ show st)
-    _ -> raise ("[T-Send] expected channel to send on got " ++ show tv2)
+            _ -> raise ("[T-Send] can only abstract over domains, got " ++ pretty kd2)
+        _ -> raise ("[T-Send] expected send channel (i.e !s) along a state including their binding, got " ++ pretty tv1 ++ " and " ++ pretty st)
+    _ -> raise ("[T-Send] expected channel to send on got " ++ pretty tv2)
 {- T-Receive -}
 typeE ctx st (Recv v) = do 
   tv <- typeV' ctx v
@@ -149,8 +150,8 @@ typeE ctx st (Recv v) = do
           kd1 <- kind' ctx d1
           kEq ctx kd1 (KDom SHSingle)
           ok ([(x, HasKind kd2)], SSMerge r (SSMerge st1 (SSBind d1 s)), t1)
-        _ -> raise ("[T-Recv] expected receive channel (i.e ?s) along a state including their binding, got " ++ show tv ++ " and " ++ show st)
-    _ -> raise ("[T-Send] expected channel to receive on, got " ++ show tv)
+        _ -> raise ("[T-Recv] expected receive channel (i.e ?s) along a state including their binding, got " ++ pretty tv ++ " and " ++ pretty st)
+    _ -> raise ("[T-Send] expected channel to receive on, got " ++ pretty tv)
 {- T-Fork -}
 typeE ctx st (Fork v) = do 
   tv <- typeV' ctx v
@@ -158,7 +159,7 @@ typeE ctx st (Fork v) = do
     EArr st1 EUnit ctx2 SSEmpty EUnit -> do
       st' <- stSplitSt ctx st st1
       ok ([], st', EUnit)
-    _ -> raise ("[T-Fork] expected Process (i.e Unit -> Unit) to fork, got" ++ show tv)
+    _ -> raise ("[T-Fork] expected Process (i.e Unit -> Unit) to fork, got" ++ pretty tv)
 {- T-Close -}
 typeE ctx st (Close v) = do
   tv <- typeV' ctx v
@@ -167,8 +168,8 @@ typeE ctx st (Close v) = do
       case stSplitDom ctx st d1 of 
         Just (r , SEnd) -> do
           ok ([], r, EUnit)
-        _ -> raise ("[T-Close] expected closable channel (i.e End) along their state binding, got " ++ show tv ++ " and " ++ show st)
-    _ -> raise ("[T-Close] expected channel to close, got " ++ show tv)
+        _ -> raise ("[T-Close] expected closable channel (i.e End) along their state binding, got " ++ pretty tv ++ " and " ++ pretty st)
+    _ -> raise ("[T-Close] expected channel to close, got " ++ pretty tv)
 {- T-Select -}
 typeE ctx st (Sel l v) = do 
   tv <- typeV' ctx v
@@ -179,8 +180,8 @@ typeE ctx st (Sel l v) = do
           case l of 
             LLeft -> ok ([], SSMerge r (SSBind d1 cl), EUnit)
             LRight -> ok ([], SSMerge r (SSBind d1 cr), EUnit)
-        _ -> raise ("[T-Select] expected selectable channel (i.e s + s') along their state binding, got " ++ show tv ++ " and " ++ show st)
-    _ -> raise ("[T-Select] expected channel to select from, got " ++ show tv)
+        _ -> raise ("[T-Select] expected selectable channel (i.e s + s') along their state binding, got " ++ pretty tv ++ " and " ++ pretty st)
+    _ -> raise ("[T-Select] expected channel to select from, got " ++ pretty tv)
 {- T-Case -}
 typeE ctx st (Case v e1 e2) = do 
   tv <- typeV' ctx v
@@ -192,10 +193,10 @@ typeE ctx st (Case v e1 e2) = do
           tri2 @ (ctxr, str, tr) <- typeE' ctx (SSMerge r (SSBind d1 s2)) e2
           existEq ctx tri1 tri2 
           ok (ctxl, stl, tl)
-        _ -> raise ("[T-Select] expected branched channel (i.e s & s') along a state including their binding, got " ++ show tv ++ " and " ++ show st)
-    _ -> raise ("[T-Select] expected channel to case split on got " ++ show tv)
+        _ -> raise ("[T-Select] expected branched channel (i.e s & s') along a state including their binding, got " ++ pretty tv ++ " and " ++ pretty st)
+    _ -> raise ("[T-Select] expected channel to case split on got " ++ pretty tv)
 
 stSplitDom' :: Ctx -> Type -> Type -> Result Type
 stSplitDom' ctx st d = case stSplitDom ctx st d of
         Just (r , s) -> ok s
-        Nothing -> raise ("[T-Split] could not find session type for " ++ show d  ++  " in state " ++ show st)
+        Nothing -> raise ("[T-Split] could not find session type for " ++ pretty d  ++  " in state " ++ pretty st)

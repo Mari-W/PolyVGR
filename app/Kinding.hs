@@ -6,6 +6,7 @@ import Equality
 import Result
 import Constraints
 import State
+import Pretty
 
 kwf :: Ctx -> Kind -> Result ()
 kwf ctx KType = ok ()
@@ -38,11 +39,11 @@ cwf' ((x, h) : xs) = case h of
     kr <- kind' xs r
     case (kl, kr) of 
       (KDom _, KDom _) -> cwf' xs
-      _ -> raise ("[CF-ConsCstr] expected domains as constraints, got " ++ show kl ++ " and " ++ show kr)   
+      _ -> raise ("[CF-ConsCstr] expected domains as constraints, got " ++ pretty kl ++ " and " ++ pretty kr)   
 
 kind' ctx t = case kind ctx t of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    kind of " ++ show t ++ " \n         in " ++ show ctx
+  Left err -> Left $ err ++ "\n    kind of " ++ pretty t ++ " \n         in [" ++ pretty ctx ++ "]"
 
 kind :: Ctx -> Type -> Result Kind
 {- K-Var -}
@@ -55,20 +56,20 @@ kind ctx (TApp f a) = do
     KLam d c -> do
       kEq ctx d ka
       ok c
-    _ -> raise ("[K-App] expected type level abstraction to apply to, got " ++ show kf)
+    _ -> raise ("[K-App] expected type level abstraction to apply to, got " ++ pretty kf)
 {- K-Lam -}
-kind ctx (TLam s d t) = do
-  kd <- kind' ctx d
-  case kd of
+kind ctx (TLam s k t) = do
+  kwf ctx k
+  case k of
     KDom sh -> do
       ksh <- kind' ctx sh
       kEq ctx ksh KShape
-      ctx' <- (s, kd) +* gd ctx
+      ctx' <- (s, k) +* gd ctx
       cwf ctx'
       kt <- kind' ctx' t
       kEqs ctx kt [KType, KState]
-      ok (KLam kd kt)
-    _ -> raise ("[K-Lam] can only abstract over domains, got " ++ show d)
+      ok (KLam k kt)
+    _ -> raise ("[K-Lam] can only abstract over domains, got " ++ pretty k)
 {- K-All -}
 kind ctx (EAll s k cs t) = do
   kNEq ctx k KType 
@@ -98,7 +99,7 @@ kind ctx (EChan d) = do
   kd <- kind' ctx d
   case kd of
     KDom SHSingle -> ok KType
-    _ -> raise ("[K-Chan] expected single domain, got " ++ show kd)
+    _ -> raise ("[K-Chan] expected single domain, got " ++ pretty kd)
 {- K-AccessPoint -}
 kind ctx (EAcc s) = do
   ks <- kind' ctx s
@@ -128,7 +129,7 @@ kind ctx (SSend s k ss t c) = do
       kt <- kind' ctx' t
       kEq ctx kt KType
       ok KSession
-    _ -> raise ("[K-Recv] can only abstract over domains, got " ++ show k)
+    _ -> raise ("[K-Recv] can only abstract over domains, got " ++ pretty k)
 {- K-Recv -}
 kind ctx (SRecv s k ss t c) = do
   kc <- kind' ctx c
@@ -144,7 +145,7 @@ kind ctx (SRecv s k ss t c) = do
       kt <- kind' ctx' t
       kEq ctx kt KType
       ok KSession
-    _ -> raise ("[K-Recv] can only abstract over domains, got " ++ show k)
+    _ -> raise ("[K-Recv] can only abstract over domains, got " ++ pretty k)
 {- K-Branch -}
 kind ctx (SBranch l r) = do
   kl <- kind' ctx l
@@ -171,7 +172,7 @@ kind ctx SHEmpty = ok KShape
 {- K-ShapeChan -}
 kind ctx SHSingle = ok KShape
 {- K-ShapePair -}
-kind ctx (SHDisjoint l r) = do
+kind ctx (SHMerge l r) = do
   kl <- kind' ctx l
   kEq ctx kl KShape
   kr <- kind' ctx r
@@ -191,14 +192,14 @@ kind ctx (DMerge l r) = do
         KDom shr -> do
           kshr <- kind' ctx shr
           kEq ctx kshr KShape
-          ok (KDom (SHDisjoint shl shr))
-        _ -> raise ("[K-DomMerge] expected to merge domains, got " ++ show r)
-    _ -> raise ("[K-DomMerge] expected to merge domains, got " ++ show l)
+          ok (KDom (SHMerge shl shr))
+        _ -> raise ("[K-DomMerge] expected to merge domains, got " ++ pretty r)
+    _ -> raise ("[K-DomMerge] expected to merge domains, got " ++ pretty l)
 {- K-DomProj -}
 kind ctx (DProj l d) = do
   kd <- kind' ctx d
   case kd of
-    KDom (SHDisjoint shl shr) -> do
+    KDom (SHMerge shl shr) -> do
       kshl <- kind' ctx shl
       kEq ctx kshl KShape
       kshr <- kind' ctx shr
@@ -206,7 +207,7 @@ kind ctx (DProj l d) = do
       case l of
         LLeft -> ok (KDom shl)
         LRight -> ok (KDom shr)
-    _ -> raise ("[K-DomProj] expected merged domain, got " ++ show d)
+    _ -> raise ("[K-DomProj] expected merged domain, got " ++ pretty d)
 {- K-StEmpty -}
 kind ctx SSEmpty = ok KState
 {- K-StChan -}
@@ -217,7 +218,7 @@ kind ctx (SSBind d s) = do
   case kd of
     KDom SHSingle -> do
       ok KState
-    _ -> raise ("[K-StChan] expected single domain, got " ++ show d)
+    _ -> raise ("[K-StChan] expected single domain, got " ++ pretty d)
 {- K-StMerge -}
 kind ctx (SSMerge ssl ssr) = do
   stDisj ctx ssl ssr
