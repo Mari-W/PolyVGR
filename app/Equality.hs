@@ -123,17 +123,24 @@ tUnify ctx eqs (SSMerge l r) (SSMerge l' r') = do
   ok (l ++ r)
 tUnify ctx eqs a b = raise ("[T-Unify] could not unify " ++ show a ++ " and " ++ show b)
 
+ctxUnifyH :: [Equiv] ->  [Equiv] -> Ctx -> Ctx -> Ctx -> Result [Result ()]
+ctxUnifyH eqs uqs ctx [] ctx2 = ok [] 
+ctxUnifyH eqs uqs ctx ((x, HasType t) : xs) ctx2 = case find (\(x', y') -> x == x') uqs of 
+  Nothing -> do 
+    t' <- x .? ctx2
+    xs' <- ctxUnifyH eqs uqs ctx xs ctx2
+    ok (tEq' ctx eqs t t' : xs')
+  Just (_, y) -> do
+    t' <- y .? ctx2
+    xs' <- ctxUnifyH eqs uqs ctx xs ctx2
+    ok (tEq' ctx eqs t t' : xs')
+ctxUnifyH _ _ _ _ _ = raise "[T-Unify] expected context with only dom bindings"
+
 {- dom binding ctxs only  -}
 ctxUnify' :: [Equiv] -> [Equiv] -> Ctx -> Ctx -> Ctx -> Result [Equiv]
 ctxUnify' eqs uqs ctx ctx1 ctx2 = do
-  let f ctx1 ctx2 uqs = case filter isLeft [case find (\(x', y') -> x == x') uqs of 
-                               Nothing -> do 
-                                t' <- x .? ctx2
-                                tEq' ctx eqs t t' 
-                               Just (_, y) -> do
-                                t' <- y .? ctx2
-                                tEq' ctx eqs t t'                 
-                            | (x, HasType t) <- ctx1] of 
+  h <- ctxUnifyH eqs uqs ctx ctx1 ctx2
+  let f ctx1 ctx2 uqs = case filter isLeft h of 
                           [] -> ok ()
                           xs -> raise ("[T-Unify] fail to compare contexts: " ++ join ["\n  " ++ s | (Left s) <- xs])
   f ctx1 ctx2 uqs
@@ -143,7 +150,7 @@ ctxUnify' eqs uqs ctx ctx1 ctx2 = do
 {- unification for ∃Γ.Σ;T -}
 existEq :: Ctx -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result ()
 existEq ctx = existEq' ctx []
-
+    
 existEq' :: Ctx -> [Equiv] -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result ()
 existEq' ctx eqs tri1 tri2 = do
   l <- existUnify' ctx eqs tri1 tri2

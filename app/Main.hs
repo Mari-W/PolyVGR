@@ -83,6 +83,6 @@ v11 = VTAbs "c" (KDom SHSingle) [] (
       )
 
 main :: IO ()
-main = case typeV [] v11 of   
-  Left s -> putStrLn s
+main = case typeV' [] v11 of   
+  Left s -> putStrLn $ "type error: " ++ s
   Right ki -> print ki
