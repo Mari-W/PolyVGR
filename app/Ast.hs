@@ -62,6 +62,10 @@ data Val
   | VAbs Type String Type Expr
   deriving (Show, Eq)
 
+type ChanBind = ((String, String), Type)
+type AccBind = (String, Type)
+type Program = ([ChanBind], [AccBind], [Expr])
+
 data Label
   = LLeft
   | LRight

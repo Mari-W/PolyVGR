@@ -23,7 +23,6 @@ tNf (SDual (SRecv n sh st t s)) = SSend n sh st t (tNf  (SDual s))
 tNf (SDual (SChoice st st')) = SBranch (tNf (SDual st)) (tNf (SDual st'))
 {- TC-DualBranch -}
 tNf (SDual (SBranch st st')) = SChoice (tNf (SDual st)) (tNf (SDual st'))
-{- recurse -}
 tNf (TApp t t') = TApp (tNf t) (tNf t')
 tNf (TLam s k t) = TLam s k (tNf t)
 tNf (EAll s k cs t) = EAll s k (map (bimap tNf tNf) cs) (tNf  t)

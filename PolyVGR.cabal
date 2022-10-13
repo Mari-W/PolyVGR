@@ -16,7 +16,7 @@ version:            0.1.0
 author:             Marius Weidner
 maintainer:         weidner@cs.uni-freiburg.de
 
-executable polymorphic-imperative-session-types
+executable PolyVGR
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
