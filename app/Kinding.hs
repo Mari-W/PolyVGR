@@ -42,7 +42,7 @@ cwf' ((x, h) : xs) = case h of
 
 kind' ctx t = case kind ctx t of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    kind of " ++ show t
+  Left err -> Left $ err ++ "\n    kind of " ++ show t ++ " \n         in " ++ show ctx
 
 kind :: Ctx -> Type -> Result Kind
 {- K-Var -}
@@ -77,7 +77,7 @@ kind ctx (EAll s k cs t) = do
   ctx' <- cs +-* ctx'
   cwf ctx'
   kt <- kind' ctx' t
-  kEq ctx kt KType
+  kEq ctx' kt KType
   ok KType 
 {- K-Arr -}
 kind ctx (EArr s1 t1 ctx2 s2 t2) = do
@@ -89,9 +89,9 @@ kind ctx (EArr s1 t1 ctx2 s2 t2) = do
   let ctx' = dce ctx ctx2
   cwf ctx'
   ks2 <- kind' ctx' s2
-  kEq ctx ks2 KState 
+  kEq ctx' ks2 KState 
   kt2 <- kind' ctx' t2
-  kEq ctx kt2 KType 
+  kEq ctx' kt2 KType 
   ok KType
 {- K-Chan -}
 kind ctx (EChan d) = do

@@ -13,7 +13,7 @@ import Debug.Trace
 
 typeV' ctx v = case typeV ctx v of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    type of " ++ show v
+  Left err -> Left $ err ++ "\n    type of " ++ show v ++ "\n         in " ++ show ctx
 
 
 typeV :: Ctx -> Val -> Result Type
@@ -30,13 +30,13 @@ typeV ctx (VPair l r) = do
   ok (EPair tl tr)
 {- T-TAbs -}
 typeV ctx (VTAbs s k cs v) = do
-  ctx' <- cs +-* ctx
-  ctx' <- (s, k) +* ctx'
+  ctx' <- (s, k) +* ctx
+  ctx' <- cs +-* ctx'
   cwf ctx'
   tv <- typeV' ctx' v
   kt <- kind' ctx (EAll s k cs tv)
   kEq ctx kt KType
-  ok tv
+  ok (EAll s k cs tv)
 {- T-Chan -}
 typeV ctx (VChan d) = do
   d' <- kind' ctx d
@@ -54,7 +54,7 @@ typeV ctx (VAbs st s t e) = do
 
 typeE' ctx st e = case typeE ctx st e of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    type of " ++ show e
+  Left err -> Left $ err ++ "\n    type of " ++ show e ++ "\n         in " ++ show ctx
 
 typeE :: Ctx -> Type -> Expr -> Result (Ctx, Type, Type)
 {- T-Let -}
