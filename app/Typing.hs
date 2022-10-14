@@ -196,7 +196,41 @@ typeE ctx st (Case v e1 e2) = do
         _ -> raise ("[T-Select] expected branched channel (i.e s & s') along a state including their binding, got " ++ pretty tv ++ " and " ++ pretty st)
     _ -> raise ("[T-Select] expected channel to case split on got " ++ pretty tv)
 
-stSplitDom' :: Ctx -> Type -> Type -> Result Type
-stSplitDom' ctx st d = case stSplitDom ctx st d of
-        Just (r , s) -> ok s
-        Nothing -> raise ("[T-Split] could not find session type for " ++ pretty d  ++  " in state " ++ pretty st)
+
+typeP :: Program -> Result ()
+typeP (abs, cbs, es) = do
+  ctx <- typeCA [] abs
+  (ctx', st') <- typeCC ctx SSEmpty cbs
+  st'' <- typeCE ctx' st' es
+  tEq ctx' st'' SSEmpty 
+
+
+typeCA :: Ctx -> [AccBind] -> Result Ctx
+typeCA ctx [] = ok ctx
+typeCA ctx ((s, t) : xs) = do
+  case t of
+    EAcc ty -> do 
+      kt <- kind ctx t
+      kEq ctx kt KSession
+      ctx' <- (s, t) +. ctx
+      typeCA ctx' xs
+    _ -> raise ("[T-NuAccess] expected access point binding, got " ++ pretty t)
+
+typeCC :: Ctx -> Type -> [ChanBind] -> Result (Ctx, Type) 
+typeCC ctx st [] = ok (ctx, st)
+typeCC ctx st (((s, s'), SEnd) : xs) = do
+  let ctx' = dce ctx [(s, HasKind (KDom SHSingle)), (s', HasKind (KDom SHSingle))]
+  typeCC ctx' st xs
+typeCC ctx st (((s, s'), t) : xs) = do
+  kt <- kind ctx t
+  kEq ctx kt KSession
+  let ctx' = dce ctx [(s, HasKind (KDom SHSingle)), (s', HasKind (KDom SHSingle))]
+  typeCC ctx' (SSMerge st (SSMerge (SSBind (TVar s) t) (SSBind (TVar s') (SDual t)))) xs
+
+
+typeCE :: Ctx -> Type -> [Expr] -> Result Type
+typeCE ctx st [] = ok st
+typeCE ctx st (e : xs) = do
+  (ctx', st', t) <- typeE ctx st e
+  st'' <- stSplitSt ctx st st'
+  typeCE ctx st' xs

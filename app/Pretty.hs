@@ -29,6 +29,15 @@ instance Pretty Cstr where
 instance Pretty (Ctx, Type, Type) where
   pp p (ctx, st, t) = "∃" ++ pp 0 ctx ++ ". " ++ pp 0 st ++  "; " ++ pp 0 t
 
+instance Pretty Program where
+  pp p (abs, cbs, es) = "[" ++ pp 0 abs ++ "]\n[" ++ pp 0 cbs ++ "]\n[" ++ pp 0 es ++ "]"
+
+instance Pretty (String, Type) where
+  pp p (s, t) = "ν" ++ s ++ " : " ++ pp 0 t
+
+instance Pretty ((String, String), Type) where
+  pp p ((s, s'), t) = "ν" ++ s ++ "," ++ s' ++ " ↦ " ++ pp 0 t
+
 instance Pretty (String, Has) where
   pp p (s, HasType t) = s ++ " : " ++ pp p t
   pp p (s, HasKind k) = s ++ " : " ++ pp p k

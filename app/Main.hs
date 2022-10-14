@@ -4,6 +4,7 @@ import Ast
 import Kinding
 import Typing
 import Pretty 
+import Eval
 
 t1 = EAll "c" (KDom SHSingle) [] (
       EAll "s" KSession [] (
@@ -71,7 +72,7 @@ t3 = EAll "n" KShape [] (
       )
     ) 
 
-v11 = VTAbs "c" (KDom SHEmpty) [] (
+v11 = VTAbs "c" (KDom SHSingle) [] (
         VTAbs "s" KSession [] (
           VAbs SSEmpty  "x" EUnit (
             Val (VAbs (SSBind (TVar "c") (
@@ -84,6 +85,6 @@ v11 = VTAbs "c" (KDom SHEmpty) [] (
       )
 
 main :: IO ()
-main = case typeV' [] v11 of   
+main = case evalV v11 of   
   Left s -> putStrLn $ "TYPE ERROR\n" ++ s
-  Right ki -> putStrLn (pretty ki)
+  Right p -> putStrLn (pretty p)

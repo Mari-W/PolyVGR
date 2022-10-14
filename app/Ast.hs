@@ -64,7 +64,7 @@ data Val
 
 type ChanBind = ((String, String), Type)
 type AccBind = (String, Type)
-type Program = ([ChanBind], [AccBind], [Expr])
+type Program = ([AccBind], [ChanBind], [Expr])
 
 data Label
   = LLeft
