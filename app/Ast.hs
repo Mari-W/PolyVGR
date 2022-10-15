@@ -66,6 +66,11 @@ type ChanBind = ((String, String), Type)
 type AccBind = (String, Type)
 type Program = ([AccBind], [ChanBind], [Expr])
 
+data ExprCtx
+  = ECHole   
+  | ECLet String ExprCtx Expr
+  deriving (Show, Eq)
+
 data Label
   = LLeft
   | LRight

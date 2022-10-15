@@ -86,5 +86,5 @@ v11 = VTAbs "c" (KDom SHSingle) [] (
 
 main :: IO ()
 main = case evalV v11 of   
-  Left s -> putStrLn $ "TYPE ERROR\n" ++ s
+  Left s -> putStrLn s
   Right p -> putStrLn (pretty p)

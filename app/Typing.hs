@@ -9,7 +9,6 @@ import Kinding
 import Result
 import State
 import Substitution
-import Debug.Trace
 import Pretty
 
 typeV' ctx v = case typeV ctx v of
@@ -204,7 +203,6 @@ typeP (abs, cbs, es) = do
   st'' <- typeCE ctx' st' es
   tEq ctx' st'' SSEmpty 
 
-
 typeCA :: Ctx -> [AccBind] -> Result Ctx
 typeCA ctx [] = ok ctx
 typeCA ctx ((s, t) : xs) = do
@@ -227,10 +225,9 @@ typeCC ctx st (((s, s'), t) : xs) = do
   let ctx' = dce ctx [(s, HasKind (KDom SHSingle)), (s', HasKind (KDom SHSingle))]
   typeCC ctx' (SSMerge st (SSMerge (SSBind (TVar s) t) (SSBind (TVar s') (SDual t)))) xs
 
-
 typeCE :: Ctx -> Type -> [Expr] -> Result Type
 typeCE ctx st [] = ok st
 typeCE ctx st (e : xs) = do
-  (ctx', st', t) <- typeE ctx st e
-  st'' <- stSplitSt ctx st st'
+  (_, st', _) <- typeE ctx st e
+  _ <- stSplitSt ctx st st'
   typeCE ctx st' xs
