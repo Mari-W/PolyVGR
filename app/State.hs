@@ -12,7 +12,7 @@ type Proj = (Type, Type)
 stDom :: Type -> Result Type
 stDom SSEmpty = ok DEmpty 
 stDom (SSBind d s) = ok d 
-stDom (TApp _ d) = ok d 
+stDom (TApp _ d) = ok d
 stDom (SSMerge l r) = do
   dl <- stDom l
   dr <- stDom r
@@ -26,12 +26,10 @@ stDisj ctx ssl ssr = do
   ce ctx [(dssl, dssr)]
 
 stSplitDom :: Ctx -> Type -> Type -> Maybe (Type,  Type)
-stSplitDom ctx (SSBind d1 s) d2 = do
-  case tEq ctx d1 d2 of 
+stSplitDom ctx (SSBind d1 s) d2 = case tEq ctx d1 d2 of 
     Left _ -> Nothing
     Right _ -> Just (SSEmpty, s)
-stSplitDom ctx (SSMerge l r) d = do
-  case (stSplitDom ctx l d, stSplitDom ctx r d) of 
+stSplitDom ctx (SSMerge l r) d = case (stSplitDom ctx l d, stSplitDom ctx r d) of 
     (Nothing, Nothing) -> Nothing
     (Just (re, l), _) -> Just (SSMerge re r, l)
     (_, Just (re, r)) -> Just (SSMerge l re, r)
@@ -40,21 +38,16 @@ stSplitDom ctx t d = Nothing
 splitSt :: Type -> Result [Proj]
 splitSt SSEmpty = ok []
 splitSt (SSBind d st) = ok [(d, st)]
-splitSt (SSMerge l r) = do
-  sl <- splitSt l
-  sr <- splitSt r
-  ok (sl ++ sr)
+splitSt (SSMerge l r) = (++) <$> splitSt l <*> splitSt r
 splitSt t = raise ("[T-Split] expected state to split, got " ++ pretty t)
 
 stSplitApp :: Ctx -> Type -> Type -> Maybe Type
-stSplitApp ctx (TApp fd d) (TApp fd2 d2) = do
-  case tEq ctx fd fd2 of 
+stSplitApp ctx (TApp fd d) (TApp fd2 d2) =case tEq ctx fd fd2 of 
     Left _ -> Nothing
     Right _ -> case tEq ctx d d2 of
       Left s -> Nothing
       Right x0 -> Just SSEmpty 
-stSplitApp ctx (SSMerge l r) d = do
-  case (stSplitApp ctx l d, stSplitApp ctx r d) of 
+stSplitApp ctx (SSMerge l r) d = case (stSplitApp ctx l d, stSplitApp ctx r d) of 
     (Nothing, Nothing) -> Nothing
     (Just s, _) -> Just (SSMerge s r)
     (_, Just s) -> Just (SSMerge l s)

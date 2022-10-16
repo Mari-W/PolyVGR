@@ -9,6 +9,11 @@ data Kind
   | KLam Kind Kind
   deriving (Show, Eq)
 
+data Label
+  = LLeft
+  | LRight
+  deriving (Show, Eq)
+
 data Type
   = TVar String
   | TApp Type Type
@@ -62,20 +67,6 @@ data Val
   | VAbs Type String Type Expr
   deriving (Show, Eq)
 
-type ChanBind = ((String, String), Type)
-type AccBind = (String, Type)
-type Program = ([AccBind], [ChanBind], [Expr])
-
-data ExprCtx
-  = ECHole   
-  | ECLet String ExprCtx Expr
-  deriving (Show, Eq)
-
-data Label
-  = LLeft
-  | LRight
-  deriving (Show, Eq)
-
 type Cstr = (Type, Type)
 
 data Has
@@ -85,3 +76,12 @@ data Has
   deriving (Show, Eq)
 
 type Ctx = [(String, Has)]
+
+type ChanBind = ((String, String), Type)
+type AccBind = (String, Type)
+type Program = ([AccBind], [ChanBind], [Expr])
+
+data ExprCtx
+  = ECHole   
+  | ECLet String ExprCtx Expr
+  deriving (Show, Eq)

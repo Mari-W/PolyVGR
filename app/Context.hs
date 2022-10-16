@@ -18,13 +18,13 @@ import Pretty
   s ?! ctx
   ok (ctx ++ [(s, HasType t)])
 
-(+-) :: Cstr -> Ctx -> Result Ctx
+(+-) :: Cstr -> Ctx -> Ctx
 c +- ctx = do
-  ok (ctx ++ [("__constraint", HasCstr c)])
-(+-*) :: [Cstr] -> Ctx -> Result Ctx
-[] +-* ctx = ok ctx
-(x : xs) +-* ctx = do
-  ctx' <- x +- ctx
+  ctx ++ [("__constraint", HasCstr c)]
+  
+(+-*) :: [Cstr] -> Ctx -> Ctx
+[] +-* ctx = ctx
+(x : xs) +-* ctx = let ctx' = x +- ctx in
   xs +-* ctx'
 
 (*?) :: String -> Ctx -> Result Kind

@@ -10,8 +10,6 @@ import Text.ParserCombinators.Parsec.Language
 import qualified Text.ParserCombinators.Parsec.Token as Token
 
 langDef = emptyDef {
-    Token.commentStart  = "/*", 
-    Token.commentEnd    = "*/",
     Token.commentLine   = "//",
     Token.identStart    = letter,
     Token.identLetter   = alphaNum,
@@ -19,18 +17,29 @@ langDef = emptyDef {
                             "Session", 
                             "State", 
                             "Shape", 
-                            "Dom", 
-                            "All", 
-                            "Lam", 
-                            "Chan", 
+                            "Dom",
+                            "λ",
+                            "\\", 
+                            "∀",
+                            "all",
+                            "forall",
+                            "∃",
+                            "ex",
+                            "exists",
+                            "Chan",
                             "Unit", 
-                            "End", 
-                            "Acc", 
-                            "I", 
+                            "End",  
+                            "I",
+                            "𝕀",
                             "X",
-                            "lam", 
+                            "𝕏",
                             "let", 
-                            "in", 
+                            "in",
+                            "proj", 
+                            "left",
+                            "π₁",
+                            "right",
+                            "π₂",
                             "fork", 
                             "accept", 
                             "request", 
@@ -41,27 +50,35 @@ langDef = emptyDef {
                             "case", 
                             "of", 
                             "close", 
-                            "new" ],
-    Token.reservedOpNames = [ ";", 
-                              "@", 
-                              "@@", 
-                              "x", 
-                              "+", 
-                              "&", 
-                              "'", 
-                              ".1", 
-                              ".2", 
+                            "new",
+                            "chan",
+                            "Λ",
+                            "unit"],
+    Token.reservedOpNames = [ "->",
+                              "→",
+                              "=>",
+                              "⇒",
+                              "↦",
+                              "x",
+                              "×",
+                              ":",
+                              ";", 
+                              "+",
+                              "⊕", 
+                              "&",
+                              "~",   
                               ",", 
-                              "#", 
-                              "=", 
-                              "->" ]
+                              "#",
+                              "="]
 }
 
 lexer = Token.makeTokenParser langDef
 identifier = Token.identifier lexer
-reserved   = Token.reserved   lexer
+reserved   = Token.reserved lexer
 reservedOp = Token.reservedOp lexer
 parens     = Token.parens lexer
+braces     = Token.braces lexer
+brackets   = Token.brackets lexer
 whiteSpace = Token.whiteSpace lexer
 
 parser = whiteSpace >> expr

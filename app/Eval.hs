@@ -59,8 +59,7 @@ fixEvalEs es = let es' = map (mapExprCtx evalE') es in
   if es == es'  then es' else fixEvalEs es'
 
 evalP :: Program -> Result Program
-evalP p @ (abs, cbs, es) = do
-  let es' = fixEvalEs es
+evalP p @ (abs, cbs, es) = let es' = fixEvalEs es in
   case tryEvalC p of
     Nothing -> ok p
     Just p' -> do

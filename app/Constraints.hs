@@ -9,10 +9,7 @@ import Pretty
 
 splitDom :: Type -> Result [Type]
 splitDom DEmpty = ok []
-splitDom (DMerge d d') = do
-  xs <- splitDom d 
-  ys <- splitDom d'
-  ok (xs ++ ys)
+splitDom (DMerge d d') = (++) <$> splitDom d <*> splitDom d'
 splitDom (DProj l d) = ok [DProj l d]
 splitDom (TVar x) = ok [TVar x]
 splitDom t = raise ("[CE] expected state to extract dom of, got " ++ pretty t)
@@ -50,9 +47,8 @@ filterCstrs (x : xs) = case x of
 
 searchCstr :: [Cstr] -> Cstr -> Result ()
 searchCstr [] _ = raise "[CE] constraint not resolved"
-searchCstr ((x, y) : xs) (a, b) = do
-  if x == a && y == b then
-    ok ()
+searchCstr ((x, y) : xs) (a, b) = if x == a && y == b 
+  then ok ()
   else searchCstr xs (a, b)
 
 searchCstrs :: [Cstr] -> [Cstr] -> Result ()

@@ -15,7 +15,6 @@ typeV' ctx v = case typeV ctx v of
   Right x -> Right x
   Left err -> Left $ err ++ "\n    type of " ++ pretty v ++ "\n         in [" ++ pretty ctx ++ "]"
 
-
 typeV :: Ctx -> Val -> Result Type
 {- T-Var -}
 typeV ctx (VVar x) = do 
@@ -31,7 +30,7 @@ typeV ctx (VPair l r) = do
 {- T-TAbs -}
 typeV ctx (VTAbs s k cs v) = do
   ctx' <- (s, k) +* ctx
-  ctx' <- cs +-* ctx'
+  let ctx' = cs +-* ctx'
   cwf ctx'
   tv <- typeV' ctx' v
   kt <- kind' ctx (EAll s k cs tv)
@@ -113,8 +112,7 @@ typeE ctx st (Req v) = do
 typeE ctx st (Acc v) = do
   tv <- typeV' ctx v
   case tv of 
-    EAcc t -> do
-      let x = freshVar
+    EAcc t -> let x = freshVar in
       ok ([(x, HasKind (KDom SHSingle))], SSMerge st (SSBind (TVar x) (SDual t)), EChan (TVar x))
     _ -> raise ("[T-Accept] expected access point to request to, got " ++ pretty tv)
 {- T-Send -}
@@ -126,8 +124,7 @@ typeE ctx st (Send v1 v2) = do
       kd1 <- kind' ctx d1
       kEq ctx kd1 (KDom SHSingle)
       case stSplitDom ctx st d1 of 
-        Just (r , SSend x kd2 st1 t1 s) -> do
-          case kd2 of 
+        Just (r , SSend x kd2 st1 t1 s) -> case kd2 of 
             KDom sh -> do
               ksh <- kind' ctx sh
               kEq ctx ksh KShape
@@ -142,8 +139,7 @@ typeE ctx st (Send v1 v2) = do
 typeE ctx st (Recv v) = do 
   tv <- typeV' ctx v
   case tv of 
-    EChan d1 -> do
-      case stSplitDom ctx st d1 of 
+    EChan d1 -> case stSplitDom ctx st d1 of 
         Just (r , SRecv x kd2 st1 t1 s) -> do
           kwf ctx kd2
           kd1 <- kind' ctx d1
@@ -163,8 +159,7 @@ typeE ctx st (Fork v) = do
 typeE ctx st (Close v) = do
   tv <- typeV' ctx v
   case tv of
-    EChan d1 -> do
-      case stSplitDom ctx st d1 of 
+    EChan d1 -> case stSplitDom ctx st d1 of 
         Just (r , SEnd) -> do
           ok ([], r, EUnit)
         _ -> raise ("[T-Close] expected closable channel (i.e End) along their state binding, got " ++ pretty tv ++ " and " ++ pretty st)
@@ -173,10 +168,8 @@ typeE ctx st (Close v) = do
 typeE ctx st (Sel l v) = do 
   tv <- typeV' ctx v
   case tv of 
-    EChan d1 -> do
-      case stSplitDom ctx st d1 of 
-        Just (r , SChoice cl cr) -> do
-          case l of 
+    EChan d1 -> case stSplitDom ctx st d1 of 
+        Just (r , SChoice cl cr) -> case l of 
             LLeft -> ok ([], SSMerge r (SSBind d1 cl), EUnit)
             LRight -> ok ([], SSMerge r (SSBind d1 cr), EUnit)
         _ -> raise ("[T-Select] expected selectable channel (i.e s + s') along their state binding, got " ++ pretty tv ++ " and " ++ pretty st)
@@ -185,8 +178,7 @@ typeE ctx st (Sel l v) = do
 typeE ctx st (Case v e1 e2) = do 
   tv <- typeV' ctx v
   case tv of 
-    (EChan d1) -> do
-      case stSplitDom ctx st d1 of
+    (EChan d1) -> case stSplitDom ctx st d1 of
         Just (r , SBranch s1 s2) -> do    
           tri1 @ (ctxl, stl, tl) <- typeE' ctx (SSMerge r (SSBind d1 s1)) e1
           tri2 @ (ctxr, str, tr) <- typeE' ctx (SSMerge r (SSBind d1 s2)) e2
@@ -194,7 +186,6 @@ typeE ctx st (Case v e1 e2) = do
           ok (ctxl, stl, tl)
         _ -> raise ("[T-Select] expected branched channel (i.e s & s') along a state including their binding, got " ++ pretty tv ++ " and " ++ pretty st)
     _ -> raise ("[T-Select] expected channel to case split on got " ++ pretty tv)
-
 
 typeP :: Program -> Result ()
 typeP (abs, cbs, es) = do
@@ -205,8 +196,7 @@ typeP (abs, cbs, es) = do
 
 typeCA :: Ctx -> [AccBind] -> Result Ctx
 typeCA ctx [] = ok ctx
-typeCA ctx ((s, t) : xs) = do
-  case t of
+typeCA ctx ((s, t) : xs) = case t of
     EAcc ty -> do 
       kt <- kind ctx t
       kEq ctx kt KSession
@@ -216,8 +206,8 @@ typeCA ctx ((s, t) : xs) = do
 
 typeCC :: Ctx -> Type -> [ChanBind] -> Result (Ctx, Type) 
 typeCC ctx st [] = ok (ctx, st)
-typeCC ctx st (((s, s'), SEnd) : xs) = do
-  let ctx' = dce ctx [(s, HasKind (KDom SHSingle)), (s', HasKind (KDom SHSingle))]
+typeCC ctx st (((s, s'), SEnd) : xs) = 
+  let ctx' = dce ctx [(s, HasKind (KDom SHSingle)), (s', HasKind (KDom SHSingle))] in
   typeCC ctx' st xs
 typeCC ctx st (((s, s'), t) : xs) = do
   kt <- kind ctx t

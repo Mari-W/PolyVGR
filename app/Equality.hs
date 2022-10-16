@@ -41,7 +41,9 @@ tEq ctx = tEq' ctx []
 tEq' :: Ctx -> [Equiv] -> Type -> Type -> Result ()
 tEq' ctx eqs t t' = do
   l <- tUnify ctx eqs (tNf t) (tNf t')
-  if null l then ok () else raise ("[T-Eq] type mismatch between " ++ pretty t ++ " and " ++ pretty t' ++ ", the following variables should be equal: " ++ show l) 
+  if null l then ok () 
+  else raise ("[T-Eq] type mismatch between " ++ pretty t ++ " and " ++ 
+              pretty t' ++ ", the following variables should be equal: " ++ show l) 
 
 uqsConsistent :: [Equiv] -> Result ()
 uqsConsistent uqs = case ["\n  " ++ x ++ " is required to be both " ++ y ++ " and " ++ y' | 
@@ -50,9 +52,8 @@ uqsConsistent uqs = case ["\n  " ++ x ++ " is required to be both " ++ y ++ " an
     xs -> raise ("[T-Unify] fail to compare contexts: " ++ join xs)
 
 tUnify :: Ctx -> [Equiv] -> Type -> Type -> Result [Equiv]
-tUnify ctx eqs (TVar a) (TVar b) = do 
-  case (find (\ (x, y) -> x == a && y == b) eqs,
-       find (\ (x, y) -> x == b && y == a) eqs) of 
+tUnify ctx eqs (TVar a) (TVar b) =  case (find (\ (x, y) -> x == a && y == b) eqs,
+                                          find (\ (x, y) -> x == b && y == a) eqs) of 
     (Nothing, Nothing) -> if a /= b then ok [(a, b)] else ok []
     _ -> ok []
 tUnify ctx eqs (TApp d c) (TApp d' c') = do 
@@ -70,9 +71,9 @@ tUnify ctx eqs (EArr st1 t1 ctx1 st1' t1') (EArr st2 t2 ctx2 st2' t2') = do
 tUnify ctx eqs (EAll s k cs t) (EAll s' k' cs' t') = do
   kEq ctx k k'
   let cs' = renCstrsM eqs cs'
-  ctx' <- cs +-* ctx
+  let ctx' = cs +-* ctx
   ce ctx' cs'
-  ctx'' <- cs' +-* ctx
+  let ctx'' = cs' +-* ctx
   ce ctx'' cs
   tUnify ctx' ((s, s') : eqs) t t'
 tUnify ctx eqs (EChan t) (EChan t') = tUnify ctx eqs t t'
@@ -141,8 +142,8 @@ ctxUnify' :: [Equiv] -> [Equiv] -> Ctx -> Ctx -> Ctx -> Result [Equiv]
 ctxUnify' eqs uqs ctx ctx1 ctx2 = do
   h <- ctxUnifyH eqs uqs ctx ctx1 ctx2
   let f ctx1 ctx2 uqs = case filter isLeft h of 
-                          [] -> ok ()
-                          xs -> raise ("[T-Unify] fail to compare contexts: " ++ join ["\n  " ++ s | (Left s) <- xs])
+        [] -> ok ()
+        xs -> raise ("[T-Unify] fail to compare contexts: " ++ join ["\n  " ++ s | (Left s) <- xs])
   f ctx1 ctx2 uqs
   f ctx2 ctx1 (map swap uqs)
   ok [ (x , y) | (x , y) <- uqs, x `notElem` map fst ctx1 ]
@@ -154,7 +155,8 @@ existEq ctx = existEq' ctx []
 existEq' :: Ctx -> [Equiv] -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result ()
 existEq' ctx eqs tri1 tri2 = do
   l <- existUnify' ctx eqs tri1 tri2
-  if null l then ok () else raise ("[T-Eq] type mismatch between " ++ pretty tri1 ++ " and " ++ pretty tri2 ++ ", the following variables should be equal: " ++ show l)
+  if null l then ok ()else raise ("[T-Eq] type mismatch between " ++ pretty tri1 ++ " and " ++ 
+                                  pretty tri2 ++ ", the following variables should be equal: " ++ show l)
 
 existUnify' :: Ctx -> [Equiv] -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result [Equiv]
 existUnify' ctx eqs (ctx1, st1, t1) (ctx2, st2, t2) = do

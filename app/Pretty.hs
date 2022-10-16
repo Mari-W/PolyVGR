@@ -69,12 +69,12 @@ instance Pretty Type where
   pp p (SBranch ty ty') = brace p 4 (pp 5 ty  ++ " & " ++ pp 4 ty')
   pp p SEnd = "End"
   pp p (SDual ty) = brace p 80 ("~ " ++ pp 80 ty)
-  pp p SHEmpty = "I"
-  pp p SHSingle = "X"
+  pp p SHEmpty = "𝕀"
+  pp p SHSingle = "𝕏"
   pp p (SHMerge ty ty') = brace p 3 (pp 4 ty ++ " ; " ++ pp 4 ty')
   pp p DEmpty = "∗"
   pp p (DMerge ty ty') = brace p 3 (pp 4 ty ++ " , " ++ pp 4 ty')
-  pp p (DProj la ty) = brace p 100 ("𝜋" ++ pp 0 la ++ " " ++ pp 101 ty)
+  pp p (DProj la ty) = brace p 100 ("π" ++ pp 0 la ++ " " ++ pp 101 ty)
   pp p SSEmpty = "·"
   pp p (SSBind ty ty') = brace p 4 (pp 5 ty ++ " ↦ " ++ pp 5 ty') 
   pp p (SSMerge ty ty') = brace p 3 (pp 3 ty ++ " , " ++ pp 3 ty')
