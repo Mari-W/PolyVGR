@@ -1,12 +1,17 @@
 module Kinding where
 
 import Ast
-import Context
-import Equality
-import Result
-import Constraints
-import State
-import Pretty
+    ( Ctx,
+      Has(HasCstr, HasType, HasKind),
+      Kind(..),
+      Label(LRight, LLeft),
+      Type(..) )
+import Context ( (*?), (+*), (+-*), dce, gd, isDomCtx, rev )
+import Equality ( kEq, kEqs, kNEq )
+import Result ( ok, raise, Result )
+import Constraints ()
+import State ( stDisj )
+import Pretty ( Pretty(pretty) )
 
 kwf :: Ctx -> Kind -> Result ()
 kwf ctx KType = ok ()

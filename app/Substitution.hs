@@ -1,9 +1,16 @@
 module Substitution where
 
 import Ast
-import Data.Foldable
-import Data.Bifunctor
-import Context
+    ( Cstr,
+      Ctx,
+      Expr(..),
+      Has(HasCstr, HasType, HasKind),
+      Kind(KLam, KDom),
+      Type(..),
+      Val(..) )
+import Data.Foldable ( find )
+import Data.Bifunctor ( Bifunctor(bimap, second) )
+import Context ( freshVar )
 
 type Bind = String
 type Free = String

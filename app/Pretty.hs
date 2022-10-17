@@ -2,6 +2,15 @@
 module Pretty where 
 
 import Ast
+    ( Cstr,
+      Ctx,
+      Expr(..),
+      Has(..),
+      Kind(..),
+      Label(..),
+      Program,
+      Type(..),
+      Val(..) )
 
 class Pretty a where
   pp :: Int -> a -> String

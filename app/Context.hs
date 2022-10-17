@@ -1,12 +1,13 @@
 module Context where
 
 import Ast
+    ( Cstr, Ctx, Has(HasCstr, HasType, HasKind), Kind(..), Type(TVar) )
 import Data.Foldable (find)
 import Result ( ok, raise, Result )
 import Data.List (tails)
-import System.Random
-import System.IO.Unsafe
-import Pretty
+import System.Random ( newStdGen, Random(randomRs) )
+import System.IO.Unsafe ( unsafePerformIO )
+import Pretty ( Pretty(pretty) )
 
 (+*) :: (String, Kind) -> Ctx -> Result Ctx
 (s, k) +* ctx = do

@@ -1,11 +1,16 @@
 module Constraints where
 
 import Ast
-import Result
-import Context
-import Conversion
-import Data.List
-import Pretty 
+    ( Cstr,
+      Ctx,
+      Has(HasCstr),
+      Label(..),
+      Type(DProj, DEmpty, DMerge, TVar) )
+import Result ( ok, raise, Result )
+import Context ( combs )
+import Conversion ( tNf )
+import Data.List ( find )
+import Pretty ( Pretty(pretty) ) 
 
 splitDom :: Type -> Result [Type]
 splitDom DEmpty = ok []

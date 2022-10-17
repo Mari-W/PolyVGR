@@ -1,12 +1,13 @@
 module Parser where
 
-import Ast
-import Result
-import System.IO
-import Control.Monad
+import Ast ( Expr(Let), Type(TVar), Val(VUnit, VVar, VChan) )
+import Result ()
+import System.IO ()
+import Control.Monad ()
 import Text.ParserCombinators.Parsec
-import Text.ParserCombinators.Parsec.Expr
-import Text.ParserCombinators.Parsec.Language
+    ( alphaNum, letter, (<|>), parse )
+import Text.ParserCombinators.Parsec.Expr ()
+import Text.ParserCombinators.Parsec.Language ( emptyDef )
 import qualified Text.ParserCombinators.Parsec.Token as Token
 
 langDef = emptyDef {

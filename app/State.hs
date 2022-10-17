@@ -1,11 +1,11 @@
 module State where 
 
 import Ast
-
-import Result
-import Equality 
-import Constraints
-import Pretty
+    ( Ctx, Type(TApp, DEmpty, DMerge, SSEmpty, SSBind, SSMerge) )
+import Result ( ok, raise, Result )
+import Equality ( tEq ) 
+import Constraints ( ce )
+import Pretty ( Pretty(pretty) )
 
 type Proj = (Type, Type)
 

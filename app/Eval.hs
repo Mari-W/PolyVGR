@@ -1,15 +1,24 @@
 {-# LANGUAGE LambdaCase #-}
 module Eval where
+  
 import Ast
-import Substitution
-import Data.Foldable
-import Typing
-import Result
-import Context
-import Control.Applicative
-import Data.Maybe
-import Data.Functor
-import Data.Data
+    ( AccBind,
+      ChanBind,
+      Expr(..),
+      ExprCtx(..),
+      Label(LRight, LLeft),
+      Program,
+      Type(TVar, EAcc, SSend, SChoice),
+      Val(..) )
+import Substitution ( subE, subTV )
+import Data.Foldable ()
+import Typing ( typeP )
+import Result ( ok, Result )
+import Context ( freshVar )
+import Control.Applicative ( Alternative((<|>)) )
+import Data.Maybe ()
+import Data.Functor ( (<&>) )
+import Data.Data ()
 
 evalV :: Val -> Result Program
 evalV v = evalE (Val v)

@@ -1,15 +1,26 @@
 module Typing where
 
 import Ast
-import Constraints
-import Context
-import Conversion
-import Equality
-import Kinding
-import Result
-import State
-import Substitution
-import Pretty
+    ( AccBind,
+      ChanBind,
+      Ctx,
+      Expr(..),
+      Has(HasKind),
+      Kind(KDom, KType, KShape, KSession),
+      Label(LRight, LLeft),
+      Program,
+      Type(SDual, EPair, EAll, SSend, SRecv, EArr, SChoice, EUnit, EChan,
+           SBranch, SSEmpty, EAcc, SEnd, SHSingle, SSMerge, SSBind, TVar),
+      Val(..) )
+import Constraints ( ce )
+import Context ( (+*), (+-*), (+.), (.?), dce, freshVar )
+import Conversion ( tNf )
+import Equality ( existEq, kEq, tEq, tUnify )
+import Kinding ( kwf, cwf, kind', kind )
+import Result ( ok, raise, Result )
+import State ( stSplitDom, stSplitSt )
+import Substitution ( renTM, subCstrs, subT )
+import Pretty ( Pretty(pretty) )
 
 typeV' ctx v = case typeV ctx v of
   Right x -> Right x

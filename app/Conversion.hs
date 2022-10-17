@@ -1,8 +1,12 @@
 module Conversion where
 
 import Ast
-import Substitution
-import Data.Bifunctor
+    ( Label(LRight, LLeft),
+      Type(SSMerge, TVar, SEnd, TApp, TLam, EAll, EArr, EChan, EAcc,
+           EPair, SSend, SRecv, SChoice, SBranch, SDual, SHMerge, DMerge,
+           DProj, SSBind) )
+import Substitution ( subT )
+import Data.Bifunctor ( Bifunctor(bimap) )
 
 tNf :: Type -> Type
 {- TC-TApp -}

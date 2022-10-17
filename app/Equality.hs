@@ -1,17 +1,23 @@
 module Equality where
 
 import Ast
-import Context
+    ( Ctx,
+      Has(HasType),
+      Kind(..),
+      Type(SSMerge, TVar, TApp, TLam, EArr, EAll, EChan, EAcc, EUnit,
+           SSend, SRecv, SChoice, SBranch, SEnd, SDual, SHEmpty, SHSingle,
+           SHMerge, DEmpty, DMerge, DProj, SSEmpty, SSBind) )
+import Context ( (+-*), (.?) )
 import Data.Bifunctor (Bifunctor (bimap))
-import Result
-import Data.Foldable
-import Substitution
-import Constraints 
-import Conversion
-import Control.Monad
-import Data.Either
-import Data.Tuple
-import Pretty
+import Result ( ok, raise, unreachable, Result )
+import Data.Foldable ( find )
+import Substitution ( renCstrsM )
+import Constraints ( ce ) 
+import Conversion ( tNf )
+import Control.Monad ( join )
+import Data.Either ( isLeft )
+import Data.Tuple ( swap )
+import Pretty ( Pretty(pretty) )
 
 type Equiv = (String, String)
 
