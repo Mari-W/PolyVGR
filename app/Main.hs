@@ -5,6 +5,8 @@ import Kinding
 import Typing
 import Pretty 
 import Eval
+import Parser (parseFile)
+import Text.Parsec
 
 t1 = EAll "c" (KDom SHSingle) [] (
       EAll "s" KSession [] (
@@ -85,6 +87,8 @@ v11 = VTAbs "c" (KDom SHSingle) [] (
       )
 
 main :: IO ()
-main = case evalV v11 of   
-  Left s -> putStrLn s
-  Right p -> putStrLn (pretty p)
+main = do
+  s <- parseFile "/home/mari/Proglang/PolyVGR/examples/send0.pvgr" 
+  case s of
+    Left e -> putStrLn e
+    Right e -> putStrLn (pretty e)

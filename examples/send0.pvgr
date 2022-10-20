@@ -1,0 +1,2 @@
+λ({c ↦ !(∃α : Dom(I). · ; Int).σ}; y : Chan c).
+  send x on y

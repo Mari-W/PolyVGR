@@ -67,7 +67,6 @@ instance Pretty Type where
   pp p (EAll s ki xs ty) = brace p 5 ("∀(" ++ s ++ " : " ++ pp 0 ki ++ "). (" ++ pp 0 xs ++ ") => " ++ pp 5 ty)
   pp p (EArr st1 ty1 [] st2 ty2) = brace p (-1) (pp 0 st1 ++ "; " ++ pp 0 ty1 ++ " → " ++ pp 0 st2 ++ "; " ++ pp 0 ty2)
   pp p (EArr st1 ty1 ctx st2 ty2) = brace p (-1) (pp 0 st1 ++ "; " ++ pp 0 ty1 ++ " → " ++ "∃" ++ pp 0 ctx ++ ". " ++ pp 0 st2 ++ "; " ++ pp 0 ty2)
-
   pp p (EChan ty) = brace p 100 ("Chan " ++ pp 101 ty)
   pp p (EAcc ty) = brace p 100 ("[" ++ pp 0 ty ++ "]")
   pp p EUnit = "Unit"
