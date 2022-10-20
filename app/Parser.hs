@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Parser where
 
 import Ast
@@ -15,8 +15,6 @@ import Text.ParserCombinators.Parsec
     ( alphaNum, letter, parse, spaces, string, many, char, many1, optional, space, noneOf, option, sepBy1, unexpected, try, eof, (<?>), (<|>), sepBy )
 import Debug.Trace ( trace )
 import Data.List (isInfixOf)
-
-#define tl id
 
 parseFile :: String -> IO (Result Expr)
 parseFile file = do
@@ -64,19 +62,19 @@ surround cl cr r = do
   char cr
   return r_
 
-brackets = tl $ surround '[' ']'
+brackets = surround '[' ']'
 
-parens = tl $ surround '(' ')'
+parens = surround '(' ')'
 
-braces = tl $ surround '{' '}'
+braces = surround '{' '}'
 
-angles = tl $ surround '<' '>'
+angles = surround '<' '>'
 
-space1 = tl $ do
+space1 = do
   space
   spaces
 
-identifier = tl $ do
+identifier = do
   s <- many1 alphaNum
   if s `elem` kws then 
     fail $ "identifier " ++ s ++ " is a reserved keyword"
@@ -89,64 +87,64 @@ identifier = tl $ do
 
 {- kinds -}
 
-kType = tl $ do
+kType = do
   string "Type"
   return KType
 
-kSession = tl $ do
+kSession = do
   string "Session"
   return KSession
 
-kState = tl $ do
+kState = do
   string "State"
   return KState
 
-kShape = tl $ do
+kShape = do
   string "Shape"
   return KShape
 
-kDom = tl $ do
+kDom = do
   string "Dom"
   spaces
   KDom <$> shape2
 
 kind1 = foldr1 KArr <$> sepBy1 kind2 (spaces *> kwFunArr <* spaces)
-kind2 = tl (kType <|> kSession <|> kState <|> kShape <|> kDom <|> parens kind1) <?> "kind"
+kind2 = kType <|> kSession <|> kState <|> kShape <|> kDom <|> parens kind1 <?> "kind"
 
 
 {- labels -}
 
-lLeft = tl $ do
+lLeft = do
   kwLab1
   return LLeft
 
-lRight = tl $ do
+lRight = do
   kwLab2
   return LRight
 
-label = tl $lLeft <|> lRight
+label = lLeft <|> lRight
 
-lProj1 = tl $ do
+lProj1 = do
   kwProj1
   return LLeft
 
-lProj2 = tl $ do
+lProj2 = do
   kwProj2
   return LRight
 
-lProj = tl $ lProj1 <|> lProj2
+lProj = lProj1 <|> lProj2
 
 
 {- types -}
 
-tVar = tl $ TVar <$> identifier
+tVar = TVar <$> identifier
 
-tApp = tl $ do
+tApp = do
   f <- parens tLam <|> tVar
   space1
   TApp f <$> dom3
 
-domBind = tl $ do
+domBind = do
   id <- identifier
   spaces
   string ":"
@@ -154,7 +152,7 @@ domBind = tl $ do
   d <- kDom
   return (id, d)
 
-tLam = tl $ do
+tLam = do
   kwLambda
   (id, d) <- parens domBind
   spaces
@@ -163,17 +161,17 @@ tLam = tl $ do
   c <- state1 <|> et1
   return (TLam id d c)
 
-cstr = tl $ do
+cstr = do
   t <- dom1
   spaces
   string "#"
   spaces
   t_ <- dom1
   return (t, t)
-cstrs = tl $ do
+cstrs = do
   sepBy1 cstr (char ',')
 
-kBind = tl $ do
+kBind = do
   id <- identifier
   spaces
   string ":"
@@ -181,12 +179,12 @@ kBind = tl $ do
   k <- kind1
   return (id, k)
 
-et1 = tl $ eAll <|> et2
-et2 = tl $ foldr1 EPair <$> sepBy1 et3 (spaces *> kwTupTimes <* spaces)
-et3 = tl $ foldr1 TApp <$> sepBy1 et4 space1
-et4 = tl $ eChan <|> eUnit <|> eAcc <|> parens et1
+et1 = eAll <|> et2
+et2 = foldr1 EPair <$> sepBy1 et3 (spaces *> kwTupTimes <* spaces)
+et3 = foldr1 TApp <$> sepBy1 et4 space1
+et4 = eChan <|> eUnit <|> eAcc <|> parens et1
 
-eAll = tl $ do
+eAll = do
   kwForall
   (id, k) <- parens kBind
   spaces
@@ -199,20 +197,20 @@ eAll = tl $ do
   spaces
   EAll id k cs <$> et1
 
-ctxBind = tl $ do
+ctxBind = do
   id <- identifier
   spaces
   char ':'
   spaces
   k <- kDom
   return (id, HasKind k)
-ctxBinds = tl $ sepBy1 ctxBind (char ',')
-ctxEmpty = tl $ do
+ctxBinds = sepBy1 ctxBind (char ',')
+ctxEmpty = do
   kwCtxEmpty
   return []
-ctx1 = tl $ ctxEmpty <|> ctxBinds 
+ctx1 = ctxEmpty <|> ctxBinds 
 
-stTy = tl $ do
+stTy = do
   st <- braces state1
   spaces
   char ';'
@@ -220,7 +218,7 @@ stTy = tl $ do
   t <- et1
   return (st, t)
 
-ctxStTy = tl $ do
+ctxStTy = do
   ctx <- option [] (do
     kwExists
     spaces
@@ -231,26 +229,26 @@ ctxStTy = tl $ do
   (st, t) <- stTy
   return (ctx, st, t)
 
-eArr = tl $ parens $ do
+eArr = parens $ do
   (st1, t1) <- stTy
   spaces
   kwFunArr
   (ctx, st2, t2) <- ctxStTy
   return (EArr st1 t1 ctx st2 t2)
 
-eChan = tl $ do
+eChan = do
   string "Chan"
   space1
   EChan <$> dom3
 
-eAcc = tl $ EAcc <$> brackets session1
+eAcc = EAcc <$> brackets session1
 
-eUnit = tl $ do
+eUnit = do
   spaces
   string "Unit"
   return EUnit
 
-domStTy = tl $ do
+domStTy = do
   kwExists
   (id, d) <- domBind
   spaces
@@ -259,13 +257,13 @@ domStTy = tl $ do
   (st, t) <- stTy
   return (id, d, st, t)
 
-session1 = tl $ foldr1 SBranch <$> sepBy1 session2 (spaces *> char '&' <* spaces)
-session2 = tl $ foldr1 SChoice <$> sepBy1 session3 (spaces *> kwChoice <* spaces)
-session3 = tl $ sSend <|> sRecv <|> session4
-session4 = tl $ sDual <|> session5
-session5 = tl $ sEnd <|> tVar <|> parens session1
+session1 = foldr1 SBranch <$> sepBy1 session2 (spaces *> char '&' <* spaces)
+session2 = foldr1 SChoice <$> sepBy1 session3 (spaces *> kwChoice <* spaces)
+session3 = sSend <|> sRecv <|> session4
+session4 = sDual <|> session5
+session5 = sEnd <|> tVar <|> parens session1
 
-sSend = tl $ do
+sSend = do
   char '!'
   (id, d, st, t) <- parens domStTy
   spaces
@@ -273,7 +271,7 @@ sSend = tl $ do
   spaces
   SSend id d st t <$> session3
 
-sRecv = tl $ do
+sRecv = do
   char '?'
   (id, d, st, t) <- parens domStTy
   spaces
@@ -281,46 +279,46 @@ sRecv = tl $ do
   spaces
   SRecv id d st t <$> session3
 
-sEnd = tl $ do
+sEnd = do
   string "End"
   return SEnd
 
-sDual = tl $ do
+sDual = do
   char '~'
   SDual <$> session4
 
-shape1 = tl $ foldr1 SHMerge <$> sepBy1 shape2 (spaces *> char ';' <* spaces)
-shape2 = tl $ shEmpty <|> shSingle <|> tVar <|> parens shape1 
+shape1 = foldr1 SHMerge <$> sepBy1 shape2 (spaces *> char ';' <* spaces)
+shape2 = shEmpty <|> shSingle <|> tVar <|> parens shape1 
 
-shEmpty = tl $ do
+shEmpty = do
   kwShEmpty
   return SHEmpty
 
-shSingle = tl $ do
+shSingle = do
   kwShSingle
   return SHSingle
 
-shMerge = tl $ do
+shMerge = do
   t <- shape2
   spaces
   SHMerge t <$> shape2
 
-dom1 = tl $ foldr1 DMerge <$> sepBy1 dom2 (spaces *> char ',' <* spaces)
-dom2 = tl $ dProj <|> dom3
-dom3 = tl $ dEmpty <|> tVar <|> parens dom1 
+dom1 = foldr1 DMerge <$> sepBy1 dom2 (spaces *> char ',' <* spaces)
+dom2 = dProj <|> dom3
+dom3 = dEmpty <|> tVar <|> parens dom1 
 
-dEmpty = tl $ do
+dEmpty = do
   char '*'
   return DEmpty
 
-dMerge = tl $ do
+dMerge = do
   t <- dom2
   spaces
   char ','
   spaces
   DMerge t <$> dom1
 
-dProj = tl $ do
+dProj = do
   l <- lProj
   spaces
   DProj l <$> dom3
@@ -337,7 +335,7 @@ state2 = do
 
 {- expressions & values -}
 
-let1 = tl $ do
+let1 = do
   string "let"
   space1
   var <- identifier
@@ -350,38 +348,33 @@ let1 = tl $ do
   space1
   Let var exp <$> expr1
 
-{- app = tl $ do
-  v <- val2
-  space1
-  App v <$> val1 -}
-
-proj = tl $ do
+proj = do
   l <- lProj
   space1
   Proj l <$> val1
 
-aapp = tl $ do
+aapp = do
   v <- val2
   spaces
   t <- brackets (tLam <|> dom1 <|> shape1 <|> session1 <?> "expected type not of kind State or Type")
   return (AApp v t)
 
-fork = tl $ do
+fork = do
   string "fork"
   space1
   Fork <$> val1
 
-acc = tl $ do
+acc = do
   string "accept"
   space1
   Acc <$> val1
 
-req = tl $ do
+req = do
   string "request"
   space1
   Req <$> val1
 
-send = tl $ do
+send = do
   string "send"
   space1
   v <- val1
@@ -390,12 +383,12 @@ send = tl $ do
   space1
   Send v <$> val1
 
-recv = tl $ do
+recv = do
   string "receive"
   space1
   Recv <$> val1
 
-sel = tl $ do
+sel = do
   string "select"
   space1
   v <- label
@@ -405,7 +398,7 @@ sel = tl $ do
   space1
   Sel v <$> val1
 
-case_ = tl $ do
+case_ = do
   string "case"
   space1
   v <- val1
@@ -422,26 +415,26 @@ case_ = tl $ do
     return (e, e_))
   return (Case v e e_)
 
-close = tl $ do
+close = do
   string "close"
   space1
   Close <$> val1
 
-new = tl $ do
+new = do
   string "new"
   space1
   New <$> session1
 
-val = tl $ Val <$> val1
+val = Val <$> val1
 
-vVar = tl $ VVar <$> identifier
+vVar = VVar <$> identifier
 
-vChan = tl $ do
+vChan = do
   string "chan"
   space1
   VChan . TVar <$> identifier
 
-stBindTy = tl $ do
+stBindTy = do
   st <- braces state1
   spaces
   char ';'
@@ -453,7 +446,7 @@ stBindTy = tl $ do
   t <- et1
   return (st, id, t)
 
-vAbs = tl $ do
+vAbs = do
   kwLambda
   spaces
   (st, id, t) <- parens stBindTy
@@ -462,7 +455,7 @@ vAbs = tl $ do
   spaces
   VAbs st id t <$> expr1
 
-vTAbs = tl $ do
+vTAbs = do
   kwTLambda
   (id, k) <- parens kBind
   spaces
@@ -476,18 +469,18 @@ vTAbs = tl $ do
   spaces
   VTAbs id k cs <$> val1
 
-vUnit = tl $ do
+vUnit = do
   string "unit"
   return VUnit
 
-vPair = tl $ angles $ do
+vPair = angles $ do
   v <- val1
   spaces
   char ','
   spaces
   VPair v <$> val1
 
-expr1 = tl $ let1 <|> expr2 
+expr1 = let1 <|> expr2 
 expr2 = expr3 <|> (do 
   l <- sepBy1 val1 space1
   case l of 
@@ -495,7 +488,7 @@ expr2 = expr3 <|> (do
     [v] -> return $ Val v
     [v1, v2] -> return $ App v1 v2
     _ -> unexpected "nested applications not allowed in A-normal form")
-expr3 = tl (fork <|> acc <|> req <|> send <|> recv <|> sel <|> case_ <|> close <|> new <|> parens expr1) <?> "expr" 
+expr3 = fork <|> acc <|> req <|> send <|> recv <|> sel <|> case_ <|> close <|> new <|> parens expr1 <?> "expr" 
 
-val1 = tl $ vAbs <|> vTAbs <|> val2
-val2 = tl (vChan <|> vUnit <|> vPair <|> parens val1 <|> vVar) <?> "val" 
+val1 = vAbs <|> vTAbs <|> val2
+val2 = vChan <|> vUnit <|> vPair <|> parens val1 <|> vVar <?> "val" 
