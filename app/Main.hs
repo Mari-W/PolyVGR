@@ -18,11 +18,11 @@ t1 = EAll "c" (KDom SHSingle) [] (
     )
 
 t2 = EAll "n1" KShape [] (
-      EAll "ss1" (KLam (KDom (TVar "n1")) KState) [] (
+      EAll "ss1" (KArr (KDom (TVar "n1")) KState) [] (
         EAll "n2" KShape [] (
           EAll "n" KShape [] (
-            EAll "ss2" (KLam (KDom (SHMerge (TVar "n") (TVar "n2"))) KState) [] (
-              EAll "t2" (KLam (KDom (SHMerge (TVar "n") (TVar "n2"))) KType) [] (
+            EAll "ss2" (KArr (KDom (SHMerge (TVar "n") (TVar "n2"))) KState) [] (
+              EAll "t2" (KArr (KDom (SHMerge (TVar "n") (TVar "n2"))) KType) [] (
                 EAll "a1" (KDom (TVar "n1")) [] (
                   EAll "a2" (KDom  (TVar "n2")) [] (
                     EAll "g" (KDom SHSingle) [(TVar  "a1", TVar "g"), (TVar  "a2", TVar "g")] (
@@ -55,8 +55,8 @@ t2 = EAll "n1" KShape [] (
 
 t3 = EAll "n" KShape [] (
       EAll "a" (KDom (TVar "n")) [] (
-        EAll "ss" (KLam (KDom (TVar "n")) KState) [] (
-          EAll "t" (KLam (KDom (TVar "n")) KType) [] (
+        EAll "ss" (KArr (KDom (TVar "n")) KState) [] (
+          EAll "t" (KArr (KDom (TVar "n")) KType) [] (
             EAll "c" (KDom SHSingle ) [(TVar "a", TVar "c")] (
               EAll "s" KSession [] (
                 EArr SSEmpty (TApp (TVar "t") (TVar "a")) [] SSEmpty (

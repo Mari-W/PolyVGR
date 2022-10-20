@@ -30,7 +30,7 @@ instance Pretty Kind where
   pp p KState = "State"
   pp p KShape = "Shape"
   pp p (KDom t) = "Dom " ++ pp 0 t
-  pp p (KLam k k') = brace p 5 (pp 6 k ++ " → " ++ pp 5 k')
+  pp p (KArr k k') = brace p 5 (pp 6 k ++ " → " ++ pp 5 k')
 
 instance Pretty Cstr where
   pp p (t, t') = pp 0 t ++ " # " ++ pp 0 t'

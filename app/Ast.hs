@@ -6,7 +6,7 @@ data Kind
   | KState
   | KShape
   | KDom Type
-  | KLam Kind Kind
+  | KArr Kind Kind
   deriving (Show, Eq)
 
 data Label

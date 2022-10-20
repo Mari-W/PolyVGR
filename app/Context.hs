@@ -62,7 +62,7 @@ gd (x : xs) = case x of
     KShape -> x : gd xs
     KSession -> x : gd xs
     KState -> x : gd xs
-    KLam d1 d2 -> case (d1, d2) of
+    KArr d1 d2 -> case (d1, d2) of
       (KDom _, KType) -> x : gd xs
       (KDom _, KState) -> x : gd xs
       _ -> gd xs

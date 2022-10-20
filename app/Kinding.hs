@@ -21,7 +21,7 @@ kwf ctx KShape = ok ()
 kwf ctx (KDom t) = do
   k <- kind' ctx t
   kEq ctx k KShape
-kwf ctx (KLam k k') = do
+kwf ctx (KArr k k') = do
   kwf ctx k
   kwf ctx k'
   ok ()
@@ -58,7 +58,7 @@ kind ctx (TApp f a) = do
   kf <- kind' ctx f
   ka <- kind' ctx a
   case kf of
-    KLam d c -> do
+    KArr d c -> do
       kEq ctx d ka
       ok c
     _ -> raise ("[K-App] expected type level abstraction to apply to, got " ++ pretty kf)
@@ -73,7 +73,7 @@ kind ctx (TLam s k t) = do
       cwf ctx'
       kt <- kind' ctx' t
       kEqs ctx kt [KType, KState]
-      ok (KLam k kt)
+      ok (KArr k kt)
     _ -> raise ("[K-Lam] can only abstract over domains, got " ++ pretty k)
 {- K-All -}
 kind ctx (EAll s k cs t) = do

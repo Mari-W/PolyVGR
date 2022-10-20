@@ -27,7 +27,7 @@ kEq ctx KSession KSession = ok ()
 kEq ctx KState KState = ok ()
 kEq ctx KShape KShape = ok ()
 kEq ctx (KDom t1) (KDom t2) = tEq ctx t1 t2
-kEq ctx (KLam d1 c1) (KLam d2 c2) = do
+kEq ctx (KArr d1 c1) (KArr d2 c2) = do
   kEq ctx d1 d2
   kEq ctx c1 c2
 kEq ctx k1 k2 = raise ("[K-Eq] kind mismatch between " ++ pretty k1 ++ " and " ++ pretty k2)

@@ -1,2 +1,5 @@
-λ({c ↦ !(∃α : Dom(I). · ; Int).σ}; y : Chan c).
-  send x on y
+Λ(c : Dom(X)).
+  Λ(σ : Session).
+    𝜆({}; x : Unit).
+      𝜆({c ↦ !(∃α : Dom(I).{}; Unit).σ}; y : Chan c).
+        send x on y

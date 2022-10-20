@@ -5,7 +5,7 @@ import Ast
       Ctx,
       Expr(..),
       Has(HasCstr, HasType, HasKind),
-      Kind(KLam, KDom),
+      Kind(KArr, KDom),
       Type(..),
       Val(..) )
 import Data.Foldable ( find )
@@ -29,7 +29,7 @@ freeCtx bs ((s, HasCstr c) : xs) = freeCstrs bs [c] ++ freeCtx bs xs
 
 freeK :: [Bind] -> Kind -> [Free]
 freeK bs (KDom t) = freeT bs t
-freeK bs (KLam l r) = freeK bs l ++ freeK bs r
+freeK bs (KArr l r) = freeK bs l ++ freeK bs r
 freeK bs _ = []
 
 freeT :: [Bind] -> Type -> [Free]
@@ -134,7 +134,7 @@ subCtx x s ((x2, i) : xs) = do
 
 subK :: String -> Type -> Kind -> Kind
 subK x s (KDom t) = KDom (subT x s t)
-subK x s (KLam l r) = KLam (subK x s l) (subK x s r)
+subK x s (KArr l r) = KArr (subK x s l) (subK x s r)
 subK x s k = k
 
 subTM :: [(String, Type)] -> Type -> Type
