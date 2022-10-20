@@ -11,14 +11,8 @@ import Ast
            SHMerge, DEmpty, DProj, SSBind, DMerge, TVar),
       Val(VPair, VVar, VChan, VAbs, VTAbs, VUnit) )
 import Result (Result, ok, raise)
-import System.IO ()
-import Control.Monad ()
 import Text.ParserCombinators.Parsec
-    ( alphaNum, letter, parse, spaces, string, many, char, many1, optional, space, noneOf, option, sepBy1, unexpected, try, eof, (<?>), sepBy )
-import qualified Text.ParserCombinators.Parsec as P
-import Text.ParserCombinators.Parsec.Expr ()
-import Text.ParserCombinators.Parsec.Language ( emptyDef )
-import qualified Text.ParserCombinators.Parsec.Token as Token
+    ( alphaNum, letter, parse, spaces, string, many, char, many1, optional, space, noneOf, option, sepBy1, unexpected, try, eof, (<?>), (<|>), sepBy )
 import Debug.Trace ( trace )
 import Data.List (isInfixOf)
 
@@ -42,27 +36,25 @@ parseString s = do
 
 kws = ["Type", "Session", "State", "Shape", "Dom", "left", "right", "proj1", "proj2", "all", "forall", "ex", "exists", "Chan", "Unit", "I", "X", "let", "in", "fork", "accept", "request", "send", "on", "receive", "select",  "case", "of", "close", "new", "chan", "unit"]
 syms = ["->", "→", "=>", "⇒", "λ", "𝜆", "\\", "𝕀", "𝕏", "π₁", "π₂", "π", "Λ", "{", "}", "(", ")",  "[", "]",  "·", "*", "+", "⊕", "↦", ";", ":", "×", "#", "~"]
-kwFunArr = string "->" P.<|> string "→"
-kwCstrArr = string "=>" P.<|> string "⇒"
-kwTupTimes = char '*' P.<|> char '×'
-kwLambda = char 'λ' P.<|> char '𝜆' P.<|> char '\\'
-kwForall = string "all" P.<|> string "forall" P.<|> string "∀"
-kwExists = string "ex" P.<|> string "exists" P.<|> string "∃"
-kwShEmpty = char 'I' P.<|> char '𝕀'
-kwShSingle = char 'X' P.<|> char '𝕏'
-kwTLambda = char 'Λ' P.<|> char '\\'
-kwProj1 = string "π₁" P.<|> string "proj1"
-kwProj2 = string "π₂" P.<|> string "proj2"
-kwLab1 = string "1" P.<|> string "left"
-kwLab2 = string "2" P.<|> string "right"
-kwCtxEmpty = string "*" P.<|> string "·"
-kwChoice = char '+' P.<|> char '⊕'
-kwBind = string "->" P.<|> string "↦" P.<|> string "→"
+kwFunArr = string "->" <|> string "→"
+kwCstrArr = string "=>" <|> string "⇒"
+kwTupTimes = char '*' <|> char '×'
+kwLambda = char 'λ' <|> char '𝜆' <|> char '\\'
+kwForall = string "all" <|> string "forall" <|> string "∀"
+kwExists = string "ex" <|> string "exists" <|> string "∃"
+kwShEmpty = char 'I' <|> char '𝕀'
+kwShSingle = char 'X' <|> char '𝕏'
+kwTLambda = char 'Λ' <|> char '\\'
+kwProj1 = string "π₁" <|> string "proj1"
+kwProj2 = string "π₂" <|> string "proj2"
+kwLab1 = string "1" <|> string "left"
+kwLab2 = string "2" <|> string "right"
+kwCtxEmpty = string "*" <|> string "·"
+kwChoice = char '+' <|> char '⊕'
+kwBind = string "->" <|> string "↦" <|> string "→"
 
 
 {- util -}
-
-l <|> r = try l P.<|> r 
 
 surround cl cr r = do
   char cl
@@ -119,7 +111,7 @@ kDom = tl $ do
   KDom <$> shape2
 
 kind1 = foldr1 KArr <$> sepBy1 kind2 (spaces *> kwFunArr <* spaces)
-kind2 = tl (kType P.<|> kSession P.<|> kState P.<|> kShape P.<|> kDom P.<|> parens kind1) <?> "kind"
+kind2 = tl (kType <|> kSession <|> kState <|> kShape <|> kDom <|> parens kind1) <?> "kind"
 
 
 {- labels -}
@@ -132,7 +124,7 @@ lRight = tl $ do
   kwLab2
   return LRight
 
-label = tl $lLeft P.<|> lRight
+label = tl $lLeft <|> lRight
 
 lProj1 = tl $ do
   kwProj1
@@ -142,7 +134,7 @@ lProj2 = tl $ do
   kwProj2
   return LRight
 
-lProj = tl $ lProj1 P.<|> lProj2
+lProj = tl $ lProj1 <|> lProj2
 
 
 {- types -}
@@ -150,7 +142,7 @@ lProj = tl $ lProj1 P.<|> lProj2
 tVar = tl $ TVar <$> identifier
 
 tApp = tl $ do
-  f <- parens tLam P.<|> tVar
+  f <- parens tLam <|> tVar
   space1
   TApp f <$> dom3
 
@@ -168,7 +160,7 @@ tLam = tl $ do
   spaces
   string "."
   spaces
-  c <- state1 P.<|> et1
+  c <- state1 <|> et1
   return (TLam id d c)
 
 cstr = tl $ do
@@ -189,10 +181,10 @@ kBind = tl $ do
   k <- kind1
   return (id, k)
 
-et1 = tl $ eAll P.<|> et2
+et1 = tl $ eAll <|> et2
 et2 = tl $ foldr1 EPair <$> sepBy1 et3 (spaces *> kwTupTimes <* spaces)
 et3 = tl $ foldr1 TApp <$> sepBy1 et4 space1
-et4 = tl $ eChan P.<|> eUnit P.<|> eAcc P.<|> parens et1
+et4 = tl $ eChan <|> eUnit <|> eAcc <|> parens et1
 
 eAll = tl $ do
   kwForall
@@ -218,7 +210,7 @@ ctxBinds = tl $ sepBy1 ctxBind (char ',')
 ctxEmpty = tl $ do
   kwCtxEmpty
   return []
-ctx1 = tl $ ctxEmpty P.<|> ctxBinds 
+ctx1 = tl $ ctxEmpty <|> ctxBinds 
 
 stTy = tl $ do
   st <- braces state1
@@ -269,9 +261,9 @@ domStTy = tl $ do
 
 session1 = tl $ foldr1 SBranch <$> sepBy1 session2 (spaces *> char '&' <* spaces)
 session2 = tl $ foldr1 SChoice <$> sepBy1 session3 (spaces *> kwChoice <* spaces)
-session3 = tl $ sSend P.<|> sRecv P.<|> session4
-session4 = tl $ sDual P.<|> session5
-session5 = tl $ sEnd P.<|> tVar P.<|> parens session1
+session3 = tl $ sSend <|> sRecv <|> session4
+session4 = tl $ sDual <|> session5
+session5 = tl $ sEnd <|> tVar <|> parens session1
 
 sSend = tl $ do
   char '!'
@@ -298,7 +290,7 @@ sDual = tl $ do
   SDual <$> session4
 
 shape1 = tl $ foldr1 SHMerge <$> sepBy1 shape2 (spaces *> char ';' <* spaces)
-shape2 = tl $ shEmpty P.<|> shSingle P.<|> tVar P.<|> parens shape1 
+shape2 = tl $ shEmpty <|> shSingle <|> tVar <|> parens shape1 
 
 shEmpty = tl $ do
   kwShEmpty
@@ -314,8 +306,8 @@ shMerge = tl $ do
   SHMerge t <$> shape2
 
 dom1 = tl $ foldr1 DMerge <$> sepBy1 dom2 (spaces *> char ',' <* spaces)
-dom2 = tl $ dProj P.<|> dom3
-dom3 = tl $ dEmpty P.<|> tVar P.<|> parens dom1 
+dom2 = tl $ dProj <|> dom3
+dom3 = tl $ dEmpty <|> tVar <|> parens dom1 
 
 dEmpty = tl $ do
   char '*'
@@ -340,7 +332,7 @@ state2 = do
   spaces
   let pb = SSBind d <$ kwBind <* spaces <*> session1
   case d of 
-    TVar s -> TApp d <$ space1 <*> dom3 P.<|> pb
+    TVar s -> TApp d <$ space1 <*> dom3 <|> pb
     _ -> pb
 
 {- expressions & values -}
@@ -371,7 +363,7 @@ proj = tl $ do
 aapp = tl $ do
   v <- val2
   spaces
-  t <- brackets (tLam P.<|> dom1 P.<|> shape1 P.<|> session1 <?> "expected type not of kind State or Type")
+  t <- brackets (tLam <|> dom1 <|> shape1 <|> session1 <?> "expected type not of kind State or Type")
   return (AApp v t)
 
 fork = tl $ do
@@ -495,15 +487,15 @@ vPair = tl $ angles $ do
   spaces
   VPair v <$> val1
 
-expr1 = tl $ let1 P.<|> expr2 
-expr2 = expr3 P.<|> (do 
+expr1 = tl $ let1 <|> expr2 
+expr2 = expr3 <|> (do 
   l <- sepBy1 val1 space1
   case l of 
     [] -> undefined 
     [v] -> return $ Val v
     [v1, v2] -> return $ App v1 v2
     _ -> unexpected "nested applications not allowed in A-normal form")
-expr3 = tl (fork P.<|> acc P.<|> req P.<|> send P.<|> recv P.<|> sel P.<|> case_ P.<|> close P.<|> new P.<|> parens expr1) <?> "expr" 
+expr3 = tl (fork <|> acc <|> req <|> send <|> recv <|> sel <|> case_ <|> close <|> new <|> parens expr1) <?> "expr" 
 
-val1 = tl $ vAbs P.<|> vTAbs P.<|> val2
-val2 = tl (vChan P.<|> vUnit P.<|> vPair P.<|> parens val1 P.<|> vVar) <?> "val" 
+val1 = tl $ vAbs <|> vTAbs <|> val2
+val2 = tl (vChan <|> vUnit <|> vPair <|> parens val1 <|> vVar) <?> "val" 
