@@ -16,7 +16,7 @@ import Text.ParserCombinators.Parsec
 import Debug.Trace ( trace )
 import Data.List (isInfixOf)
 
-#define tl trace (__FILE__ ++":"++ show __LINE__)
+#define tl id
 
 parseFile :: String -> IO (Result Expr)
 parseFile file = do

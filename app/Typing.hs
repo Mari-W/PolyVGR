@@ -41,9 +41,9 @@ typeV ctx (VPair l r) = do
 {- T-TAbs -}
 typeV ctx (VTAbs s k cs v) = do
   ctx' <- (s, k) +* ctx
-  let ctx' = cs +-* ctx'
-  cwf ctx'
-  tv <- typeV' ctx' v
+  let ctx'' = cs +-* ctx'
+  cwf ctx''
+  tv <- typeV' ctx'' v
   kt <- kind' ctx (EAll s k cs tv)
   kEq ctx kt KType
   ok (EAll s k cs tv)

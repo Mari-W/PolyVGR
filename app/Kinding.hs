@@ -80,10 +80,10 @@ kind ctx (EAll s k cs t) = do
   kNEq ctx k KType 
   kNEq ctx k KState 
   ctx' <- (s, k) +* ctx
-  let ctx' = cs +-* ctx'
-  cwf ctx'
-  kt <- kind' ctx' t
-  kEq ctx' kt KType
+  let ctx'' = cs +-* ctx'
+  cwf ctx''
+  kt <- kind' ctx'' t
+  kEq ctx'' kt KType
   ok KType 
 {- K-Arr -}
 kind ctx (EArr s1 t1 ctx2 s2 t2) = do
