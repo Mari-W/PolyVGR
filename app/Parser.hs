@@ -12,7 +12,7 @@ import Ast
       Val(VPair, VVar, VChan, VAbs, VTAbs, VUnit) )
 import Result (Result, ok, raise)
 import Text.ParserCombinators.Parsec
-    ( alphaNum, letter, parse, spaces, string, many, char, many1, optional, space, noneOf, option, sepBy1, unexpected, try, eof, (<|>), sepBy, oneOf )
+    ( alphaNum, letter, parse, many, many1, optional, space, noneOf, option, sepBy1, unexpected, eof, (<|>), sepBy, oneOf )
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import Debug.Trace ( trace )
 import Data.List (isInfixOf)
@@ -22,13 +22,13 @@ import Text.Parsec.Language (emptyDef)
 parseFile :: String -> IO (Result Expr)
 parseFile file = do
   prog <- readFile file
-  case parse (spaces *> expr1 <* spaces <* eof) "" prog of
+  case parse (whiteSpace *> expr1 <* whiteSpace <* eof) "" prog of
     Left pe -> print pe >> fail "parse error"
     Right ex -> return (ok ex)
 
 parseString :: String -> Result Expr
 parseString s = do
-  case parse (spaces *> expr1 <* spaces <* eof) "" s of
+  case parse (whiteSpace *> expr1 <* whiteSpace <* eof) "" s of
     Left pe -> raise "parse error"
     Right ex -> ok ex
 
@@ -40,12 +40,12 @@ langDef = emptyDef {
   Token.commentLine = "//",
   Token.identStart = letter,
   Token.identLetter = alphaNum,
-  Token.reservedOpNames = ["->", "→", "=>", "⇒", "λ", "𝜆", "\\", "𝕀", "𝕏", "π₁", "π₂", "π", "Λ", "{", "}", "(", ")",  "[", "]",  "·", "*", "+", "⊕", "↦", ";", ":", "×", "#", "~"],
+  Token.reservedOpNames = ["->", "→", "=>", "⇒", "λ", "𝜆", "\\", "𝕀", "𝕏", "π₁", "π₂", "π", "Λ",  "·", "*", "+", "⊕", "↦", ";", ":", "×", "#", "~"],
   Token.reservedNames  = ["Type", "Session", "State", "Shape", "Dom", "left", "right", "proj1", "proj2", "all", "forall", "ex", "exists", "Chan", "Unit", "I", "X", "let", "in", "fork", "accept", "request", "send", "on", "receive", "select",  "case", "of", "close", "new", "chan", "unit"],
   Token.caseSensitive = True
 }
 
-lexer = Token.makeTokenParser languageDef
+lexer = Token.makeTokenParser langDef
 
 identifier = Token.identifier lexer
 reserved  = Token.reserved lexer 
@@ -57,86 +57,53 @@ angles = Token.angles lexer
 semi = Token.semi lexer
 comma = Token.comma lexer
 space = Token.whiteSpace lexer
+commaSep1 = Token.commaSep1 lexer
+commaSep = Token.commaSep lexer
+semiSep1 = Token.semiSep1 lexer
+whiteSpace = Token.whiteSpace lexer
+
 
 {- keywords -}
 
-kws = ["Type", "Session", "State", "Shape", "Dom", "left", "right", "proj1", "proj2", "all", "forall", "ex", "exists", "Chan", "Unit", "I", "X", "let", "in", "fork", "accept", "request", "send", "on", "receive", "select",  "case", "of", "close", "new", "chan", "unit"]
-syms = ["->", "→", "=>", "⇒", "λ", "𝜆", "\\", "𝕀", "𝕏", "π₁", "π₂", "π", "Λ", "{", "}", "(", ")",  "[", "]",  "·", "*", "+", "⊕", "↦", ";", ":", "×", "#", "~"]
-kwFunArr = string "->" <|> string "→"
-kwCstrArr = string "=>" <|> string "⇒"
-kwTupTimes = char '*' <|> char '×'
-kwLambda = char 'λ' <|> char '𝜆' <|> char '\\'
-kwForall = string "all"  <* space1 <|> string "forall"  <* space1 <|> string "∀"
-kwExists = string "ex" <* space1 <|> string "exists" <* space1 <|> string "∃"
-kwShEmpty = char 'I' <|> char '𝕀'
-kwShSingle = char 'X' <|> char '𝕏'
-kwTLambda = char 'Λ' <|> char '\\'
-kwProj1 = string "π₁" <|> string "proj1"
-kwProj2 = string "π₂" <|> string "proj2"
-kwLab1 = string "1" <|> string "left"
-kwLab2 = string "2" <|> string "right"
-kwCtxEmpty = string "*" <|> string "·"
-kwChoice = char '+' <|> char '⊕'
-kwBind = string "->" <|> string "↦" <|> string "→"
+kwFunArr = reservedOp "->" <|> reservedOp "→"
+kwCstrArr = reservedOp "=>" <|> reservedOp "⇒"
+kwTupTimes = reservedOp "*" <|> reservedOp "×"
+kwLambda = reservedOp "λ" <|> reservedOp "𝜆" <|> reservedOp "\\"
+kwForall = reserved "all" <|> reserved "forall" <|> reservedOp "∀"
+kwExists = reserved "ex" <|> reserved "exists" <|> reservedOp "∃"
+kwShEmpty = reservedOp "I" <|> reservedOp "𝕀"
+kwShSingle = reservedOp "X" <|> reservedOp "𝕏"
+kwTLambda = reservedOp "Λ" <|> reservedOp "\\"
+kwProj1 = reservedOp "π₁" <|> reserved "proj1"
+kwProj2 = reservedOp "π₂" <|> reserved "proj2"
+kwLab1 = reservedOp "1" <|> reserved "left"
+kwLab2 = reservedOp "2" <|> reserved "right"
+kwCtxEmpty = reservedOp "*" <|> reservedOp "·"
+kwChoice = reservedOp "+" <|> reservedOp "⊕"
+kwBind = reservedOp "->" <|> reservedOp "↦" <|> reservedOp "→"
 
-
-{- util -}
-
-surround cl cr r = do
-  char cl
-  spaces
-  r_ <- try r
-  spaces
-  char cr
-  return r_
-
-brackets = surround '[' ']'
-
-parens = surround '(' ')'
-
-braces = surround '{' '}'
-
-angles = surround '<' '>'
-
-space1 = do
-  space
-  spaces
-
-identifier = do
-  s <- many1 alphaNum
-  if s `elem` kws then 
-    fail $ "identifier " ++ s ++ " is a reserved keyword"
-  else
-    if any (`isInfixOf` s) syms then 
-      fail $ "identifier " ++ s ++ " contains a reserved symbol"
-    else
-      return s
-
-
-{- kinds -}
 
 kType = do
-  string "Type"
+  reserved "Type"
   return KType
 
 kSession = do
-  string "Session"
+  reserved "Session"
   return KSession
 
 kState = do
-  string "State"
+  reserved "State"
   return KState
 
 kShape = do
-  string "Shape"
+  reserved "Shape"
   return KShape
 
 kDom = do
-  string "Dom"
-  spaces
+  reserved "Dom"
   KDom <$> shape2
 
-kind1 = foldr1 KArr <$> sepBy1 kind2 (spaces *> kwFunArr <* spaces)
+kind1 = foldr1 KArr <$> sepBy1 kind2 kwFunArr
 kind2 = kType <|> kSession <|> kState <|> kShape <|> kDom <|> parens kind1
 
 
@@ -169,70 +136,56 @@ tVar = TVar <$> identifier
 
 tApp = do
   f <- parens tLam <|> tVar
-  space1
   TApp f <$> dom3
 
 domBind = do
   id <- identifier
-  spaces
-  string ":"
-  spaces
+  reservedOp ":"
   d <- kDom
   return (id, d)
 
 tLam = do
   kwLambda
   (id, d) <- parens domBind
-  spaces
-  string "."
-  spaces
+  reservedOp "."
   c <- state1 <|> et1
   return (TLam id d c)
 
 cstr = do
   t <- dom1
-  spaces
-  string "#"
-  spaces
+  reservedOp "#"
   t_ <- dom1
   return (t, t)
 cstrs = do
-  sepBy1 cstr (try $ spaces *> char ',' <* spaces)
+  commaSep1 cstr
 
 kBind = do
   id <- identifier
-  spaces
-  string ":"
-  spaces
+  reservedOp ":"
   k <- kind1
   return (id, k)
 
 et1 = eAll <|> et2
-et2 = foldr1 EPair <$> sepBy1 et3 (try $ spaces *> kwTupTimes <* spaces)
-et3 = foldr1 TApp <$> sepBy1 et4 (try space1)
+et2 = foldr1 EPair <$> sepBy1 et3 kwTupTimes
+et3 = foldr1 TApp <$> many1 et4
 et4 = eChan <|> eUnit <|> eAcc <|> parens et1
 
 eAll = do
   kwForall
   (id, k) <- parens kBind
-  spaces
-  string "."
+  reservedOp "."
   cs <- option [] (do
       cs <- parens cstrs
-      spaces
       kwCstrArr
       return cs)
-  spaces
   EAll id k cs <$> et1
 
 ctxBind = do
   id <- identifier
-  spaces
-  char ':'
-  spaces
+  reservedOp ":"
   k <- kDom
   return (id, HasKind k)
-ctxBinds = sepBy1 ctxBind (try $ spaces *> char ',' <* spaces)
+ctxBinds = commaSep1 ctxBind
 ctxEmpty = do
   kwCtxEmpty
   return []
@@ -240,82 +193,69 @@ ctx1 = ctxEmpty <|> ctxBinds
 
 stTy = do
   st <- braces state1
-  spaces
-  char ';'
-  spaces
+  reservedOp ";"
   t <- et1
   return (st, t)
 
 ctxStTy = do
   ctx <- option [] (do
     kwExists
-    spaces
     ctx <- ctx1
-    char '.'
-    spaces
+    reservedOp "."
     return ctx)
   (st, t) <- stTy
   return (ctx, st, t)
 
 eArr = parens $ do
   (st1, t1) <- stTy
-  spaces
   kwFunArr
   (ctx, st2, t2) <- ctxStTy
   return (EArr st1 t1 ctx st2 t2)
 
 eChan = do
-  string "Chan"
-  space1
+  reserved "Chan"
   EChan <$> dom3
 
 eAcc = EAcc <$> brackets session1
 
 eUnit = do
-  spaces
-  string "Unit"
+  reserved "Unit"
   return EUnit
 
 domStTy = do
   kwExists
   (id, d) <- domBind
-  spaces
-  char '.'
-  spaces
+  reservedOp "."
   (st, t) <- stTy
   return (id, d, st, t)
 
-session1 = foldr1 SBranch <$> sepBy1 session2 (try $ spaces *> char '&' <* spaces)
-session2 = foldr1 SChoice <$> sepBy1 session3 (try $ spaces *> kwChoice <* spaces)
+session1 = foldr1 SBranch <$> sepBy1 session2 (reservedOp "&")
+session2 = foldr1 SChoice <$> sepBy1 session3 kwChoice
 session3 = sSend <|> sRecv <|> session4
 session4 = sDual <|> session5
 session5 = sEnd <|> tVar <|> parens session1
 
 sSend = do
-  char '!'
+  reservedOp "!"
   (id, d, st, t) <- parens domStTy
-  spaces
-  char '.'
-  spaces
+  reservedOp "."
   SSend id d st t <$> session3
 
 sRecv = do
-  char '?'
+  reservedOp "?"
   (id, d, st, t) <- parens domStTy
-  spaces
-  char '.'
-  spaces
+  reservedOp "."
   SRecv id d st t <$> session3
 
 sEnd = do
-  string "End"
+  reserved "End"
   return SEnd
 
 sDual = do
-  char '~'
+  reservedOp "~"
   SDual <$> session4
 
-shape1 = foldr1 SHMerge <$> sepBy1 shape2 (try $ spaces *> char ';' <* spaces)
+shape1 = foldr1 SHMerge <$> semiSep1 shape2
 shape2 = shEmpty <|> shSingle <|> tVar <|> parens shape1 
 
 shEmpty = do
@@ -328,130 +268,99 @@ shSingle = do
 
 shMerge = do
   t <- shape2
-  spaces
   SHMerge t <$> shape2
 
-dom1 = foldr1 DMerge <$> sepBy1 dom2 (try $ spaces *> char ',' <* spaces)
+dom1 = foldr1 DMerge <$> commaSep1 dom2
 dom2 = dProj <|> dom3
 dom3 = dEmpty <|> tVar <|> parens dom1 
 
 dEmpty = do
-  char '*'
+  reservedOp "*"
   return DEmpty
 
 dMerge = do
   t <- dom2
-  spaces
-  char ','
-  spaces
+  reservedOp ","
   DMerge t <$> dom1
 
 dProj = do
   l <- lProj
-  space1
   DProj l <$> dom3
 
-state1 =  foldr SSMerge SSEmpty <$> sepBy state2 (try $ spaces *> char ',' <* spaces) <* optional (char ',')
+state1 = foldr SSMerge SSEmpty <$> commaSep state2 <* optional (reservedOp ",")
 
 state2 = do
   d <- dom3
-  spaces
-  let pb = SSBind d <$ kwBind <* spaces <*> session1
+  let pb = SSBind d <$ kwBind <*> session1
   case d of 
-    TVar s -> TApp d <$ space1 <*> dom3 <|> pb
+    TVar s -> TApp d <$> dom3 <|> pb
     _ -> pb
 
 
 {- expressions & values -}
 
 let1 = do
-  string "let"
-  space1
+  reserved "let"
   var <- identifier
-  spaces
-  char '='
-  spaces
+  reservedOp "="
   exp <- expr1
-  space1
-  string "in"
-  space1
+  reserved "in"
   Let var exp <$> expr1
 
 proj = do
   l <- lProj
-  space1
   Proj l <$> val1
 
 aapp = do
   v <- val2
-  spaces
   t <- brackets (tLam <|> dom1 <|> shape1 <|> session1)
   return (AApp v t)
 
 fork = do
-  string "fork"
-  space1
+  reserved "fork"
   Fork <$> val1
 
 acc = do
-  string "accept"
-  space1
+  reserved "accept"
   Acc <$> val1
 
 req = do
-  string "request"
-  space1
+  reserved "request"
   Req <$> val1
 
 send = do
-  string "send"
-  space1
+  reserved "send"
   v <- val1
-  space1
-  string "on"
-  space1
+  reserved "on"
   Send v <$> val1
 
 recv = do
-  string "receive"
-  space1
+  reserved "receive"
   Recv <$> val1
 
 sel = do
-  string "select"
-  space1
+  reserved "select"
   v <- label
-  space
-  spaces
-  string "on"
-  space1
+  reserved "on"
   Sel v <$> val1
 
 case1 = do
-  string "case"
-  space1
+  reserved "case"
   v <- val1
-  space
-  spaces
-  string "of"
-  space1
+  reserved "of"
   (e, e_) <- braces (do
     e <- expr1
-    spaces
-    char ';'
-    spaces
+    reservedOp ";"
     e_ <- expr1
     return (e, e_))
   return (Case v e e_)
 
 close = do
-  string "close"
-  space1
+  reserved "close"
   Close <$> val1
 
 new = do
-  string "new"
-  space1
+  reserved "new"
   New <$> session1
 
 val = Val <$> val1
@@ -459,59 +368,45 @@ val = Val <$> val1
 vVar = VVar <$> identifier
 
 vChan = do
-  string "chan"
-  space1
+  reserved "chan"
   VChan . TVar <$> identifier
 
 stBindTy = do
   st <- braces state1
-  spaces
-  char ';'
-  spaces
+  reservedOp ";"
   id <- identifier
-  spaces
-  char ':'
-  spaces
+  reservedOp ":"
   t <- et1
   return (st, id, t)
 
 vAbs = do
   kwLambda
-  spaces
   (st, id, t) <- parens stBindTy
-  spaces
-  char '.'
-  spaces
+  reservedOp "."
   VAbs st id t <$> expr1
 
 vTAbs = do
   kwTLambda
   (id, k) <- parens kBind
-  spaces
-  char '.'
-  spaces
+  reservedOp "."
   cs <- option [] (do
     cs <- parens cstrs
-    spaces
     kwCstrArr
     return cs)
-  spaces
   VTAbs id k cs <$> val1
 
 vUnit = do
-  string "unit"
+  reserved "unit"
   return VUnit
 
 vPair = angles $ do
   v <- val1
-  spaces
-  char ','
-  spaces
+  reservedOp ","
   VPair v <$> val1
 
 expr1 = let1 <|> expr2 
 expr2 = expr3 <|> (do 
-  l <- sepBy1 val1 (try space1)
+  l <- many1 val1
   case l of 
     [] -> undefined 
     [v] -> return $ Val v

@@ -1,6 +1,6 @@
 let acc = new !(ex a : Dom(I).{}; Unit).End in
-  let accThread = (\({}; u: Unit). (let xy = (request acc) in (send unit on xy))) in
-    let reqTread = (\({}; u: Unit). (let xy = (accept acc) in (receive xy))) in
+  let accThread = \({}; u: Unit). let xy = request acc in send unit on xy in
+    let reqTread = \({}; u: Unit). let xy = accept acc in receive xy in
       let x = fork accThread in
         let x2 = fork reqTread in
           unit

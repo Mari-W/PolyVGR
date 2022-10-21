@@ -1,5 +1,5 @@
 Λ(c : Dom(X)).
   Λ(σ : Session).
     λ({}; x : Unit).
-      λ({c ↦ !(∃α : Dom(X ; X).{}; Unit).σ}; y : Chan c).
+      λ({c ↦ !(∃α : Dom(X ; X).{ }; Unit).σ}; y : Chan c).
         send x on y
