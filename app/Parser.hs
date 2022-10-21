@@ -12,9 +12,12 @@ import Ast
       Val(VPair, VVar, VChan, VAbs, VTAbs, VUnit) )
 import Result (Result, ok, raise)
 import Text.ParserCombinators.Parsec
-    ( alphaNum, letter, parse, spaces, string, many, char, many1, optional, space, noneOf, option, sepBy1, unexpected, try, eof, (<?>), (<|>), sepBy )
+    ( alphaNum, letter, parse, spaces, string, many, char, many1, optional, space, noneOf, option, sepBy1, unexpected, try, eof, (<|>), sepBy, oneOf )
+import qualified Text.ParserCombinators.Parsec.Token as Token
 import Debug.Trace ( trace )
 import Data.List (isInfixOf)
+import Text.Parsec.Language (emptyDef)
+
 
 parseFile :: String -> IO (Result Expr)
 parseFile file = do
@@ -29,6 +32,31 @@ parseString s = do
     Left pe -> raise "parse error"
     Right ex -> ok ex
 
+{- tokens -}
+
+langDef = emptyDef {
+  Token.commentStart = "/*",
+  Token.commentEnd = "*/",
+  Token.commentLine = "//",
+  Token.identStart = letter,
+  Token.identLetter = alphaNum,
+  Token.reservedOpNames = ["->", "→", "=>", "⇒", "λ", "𝜆", "\\", "𝕀", "𝕏", "π₁", "π₂", "π", "Λ", "{", "}", "(", ")",  "[", "]",  "·", "*", "+", "⊕", "↦", ";", ":", "×", "#", "~"],
+  Token.reservedNames  = ["Type", "Session", "State", "Shape", "Dom", "left", "right", "proj1", "proj2", "all", "forall", "ex", "exists", "Chan", "Unit", "I", "X", "let", "in", "fork", "accept", "request", "send", "on", "receive", "select",  "case", "of", "close", "new", "chan", "unit"],
+  Token.caseSensitive = True
+}
+
+lexer = Token.makeTokenParser languageDef
+
+identifier = Token.identifier lexer
+reserved  = Token.reserved lexer 
+reservedOp = Token.reservedOp lexer
+parens = Token.parens lexer
+braces = Token.braces lexer
+brackets = Token.brackets lexer
+angles = Token.angles lexer
+semi = Token.semi lexer
+comma = Token.comma lexer
+space = Token.whiteSpace lexer
 
 {- keywords -}
 
@@ -109,7 +137,7 @@ kDom = do
   KDom <$> shape2
 
 kind1 = foldr1 KArr <$> sepBy1 kind2 (spaces *> kwFunArr <* spaces)
-kind2 = kType <|> kSession <|> kState <|> kShape <|> kDom <|> parens kind1 <?> "kind"
+kind2 = kType <|> kSession <|> kState <|> kShape <|> kDom <|> parens kind1
 
 
 {- labels -}
@@ -169,7 +197,7 @@ cstr = do
   t_ <- dom1
   return (t, t)
 cstrs = do
-  sepBy1 cstr (char ',')
+  sepBy1 cstr (try $ spaces *> char ',' <* spaces)
 
 kBind = do
   id <- identifier
@@ -180,8 +208,8 @@ kBind = do
   return (id, k)
 
 et1 = eAll <|> et2
-et2 = foldr1 EPair <$> sepBy1 et3 (spaces *> kwTupTimes <* spaces)
-et3 = foldr1 TApp <$> sepBy1 et4 space1
+et2 = foldr1 EPair <$> sepBy1 et3 (try $ spaces *> kwTupTimes <* spaces)
+et3 = foldr1 TApp <$> sepBy1 et4 (try space1)
 et4 = eChan <|> eUnit <|> eAcc <|> parens et1
 
 eAll = do
@@ -193,7 +221,7 @@ eAll = do
       cs <- parens cstrs
       spaces
       kwCstrArr
-      return cs) <?> "constraints"
+      return cs)
   spaces
   EAll id k cs <$> et1
 
@@ -204,7 +232,7 @@ ctxBind = do
   spaces
   k <- kDom
   return (id, HasKind k)
-ctxBinds = sepBy1 ctxBind (char ',')
+ctxBinds = sepBy1 ctxBind (try $ spaces *> char ',' <* spaces)
 ctxEmpty = do
   kwCtxEmpty
   return []
@@ -225,7 +253,7 @@ ctxStTy = do
     ctx <- ctx1
     char '.'
     spaces
-    return ctx) <?> "context"
+    return ctx)
   (st, t) <- stTy
   return (ctx, st, t)
 
@@ -257,8 +285,8 @@ domStTy = do
   (st, t) <- stTy
   return (id, d, st, t)
 
-session1 = foldr1 SBranch <$> sepBy1 session2 (spaces *> char '&' <* spaces)
-session2 = foldr1 SChoice <$> sepBy1 session3 (spaces *> kwChoice <* spaces)
+session1 = foldr1 SBranch <$> sepBy1 session2 (try $ spaces *> char '&' <* spaces)
+session2 = foldr1 SChoice <$> sepBy1 session3 (try $ spaces *> kwChoice <* spaces)
 session3 = sSend <|> sRecv <|> session4
 session4 = sDual <|> session5
 session5 = sEnd <|> tVar <|> parens session1
@@ -287,7 +315,7 @@ sDual = do
   char '~'
   SDual <$> session4
 
-shape1 = foldr1 SHMerge <$> sepBy1 shape2 (spaces *> char ';' <* spaces)
+shape1 = foldr1 SHMerge <$> sepBy1 shape2 (try $ spaces *> char ';' <* spaces)
 shape2 = shEmpty <|> shSingle <|> tVar <|> parens shape1 
 
 shEmpty = do
@@ -303,7 +331,7 @@ shMerge = do
   spaces
   SHMerge t <$> shape2
 
-dom1 = foldr1 DMerge <$> sepBy1 dom2 (spaces *> char ',' <* spaces)
+dom1 = foldr1 DMerge <$> sepBy1 dom2 (try $ spaces *> char ',' <* spaces)
 dom2 = dProj <|> dom3
 dom3 = dEmpty <|> tVar <|> parens dom1 
 
@@ -323,7 +351,7 @@ dProj = do
   space1
   DProj l <$> dom3
 
-state1 =  foldr SSMerge SSEmpty <$> sepBy state2 (spaces *> char ',' <* spaces) <* optional (char ',')
+state1 =  foldr SSMerge SSEmpty <$> sepBy state2 (try $ spaces *> char ',' <* spaces) <* optional (char ',')
 
 state2 = do
   d <- dom3
@@ -332,6 +360,7 @@ state2 = do
   case d of 
     TVar s -> TApp d <$ space1 <*> dom3 <|> pb
     _ -> pb
+
 
 {- expressions & values -}
 
@@ -356,7 +385,7 @@ proj = do
 aapp = do
   v <- val2
   spaces
-  t <- brackets (tLam <|> dom1 <|> shape1 <|> session1 <?> "expected type not of kind State or Type")
+  t <- brackets (tLam <|> dom1 <|> shape1 <|> session1)
   return (AApp v t)
 
 fork = do
@@ -398,7 +427,7 @@ sel = do
   space1
   Sel v <$> val1
 
-case_ = do
+case1 = do
   string "case"
   space1
   v <- val1
@@ -482,13 +511,13 @@ vPair = angles $ do
 
 expr1 = let1 <|> expr2 
 expr2 = expr3 <|> (do 
-  l <- sepBy1 val1 space1
+  l <- sepBy1 val1 (try space1)
   case l of 
     [] -> undefined 
     [v] -> return $ Val v
     [v1, v2] -> return $ App v1 v2
     _ -> unexpected "nested applications not allowed in A-normal form")
-expr3 = fork <|> acc <|> req <|> send <|> recv <|> sel <|> case_ <|> close <|> new <|> parens expr1 <?> "expr" 
+expr3 = fork <|> acc <|> req <|> send <|> recv <|> sel <|> case1 <|> close <|> new <|> parens expr1
 
 val1 = vAbs <|> vTAbs <|> val2
-val2 = vChan <|> vUnit <|> vPair <|> parens val1 <|> vVar <?> "val" 
+val2 = vChan <|> vUnit <|> vPair <|> parens val1 <|> vVar

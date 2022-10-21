@@ -44,7 +44,7 @@ s ?! ctx = case find (\(s', _) -> s' == s) (rev ctx) of
   _ -> ok ()
 
 freshVar :: String
-freshVar = take 16 $ randomRs ('a','z') $ unsafePerformIO newStdGen
+freshVar = "fresh" ++ take 5 (randomRs ('A','Z') $ unsafePerformIO newStdGen)
 
 rev :: Ctx -> Ctx
 rev = foldl (flip (:)) []

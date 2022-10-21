@@ -165,7 +165,7 @@ typeE ctx st (Fork v) = do
     EArr st1 EUnit ctx2 SSEmpty EUnit -> do
       st' <- stSplitSt ctx st st1
       ok ([], st', EUnit)
-    _ -> raise ("[T-Fork] expected Process (i.e Unit -> Unit) to fork, got" ++ pretty tv)
+    _ -> raise ("[T-Fork] expected Process (i.e (Σ; Unit -> Γ. ·; Unit) to fork, got " ++ pretty tv)
 {- T-Close -}
 typeE ctx st (Close v) = do
   tv <- typeV' ctx v

@@ -1,1 +1,2 @@
-let x = unit in unit
+let acc = new End in
+  unit
