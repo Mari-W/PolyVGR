@@ -21,16 +21,21 @@ import Pretty ( Pretty(pretty) )
 
 type Equiv = (String, String)
 
-kEq :: Ctx -> Kind -> Kind -> Result ()
-kEq ctx KType KType = ok ()
-kEq ctx KSession KSession = ok ()
-kEq ctx KState KState = ok ()
-kEq ctx KShape KShape = ok ()
-kEq ctx (KDom t1) (KDom t2) = tEq ctx t1 t2
-kEq ctx (KArr d1 c1) (KArr d2 c2) = do
+kEq ctx k1 k2 = case kEq' ctx k1 k2 of
+  Right x -> Right x
+  Left err -> Left $ err ++ "\n    equality of " ++ pretty k1 ++ " and " ++ pretty k2 ++ "\n         in [" ++ pretty ctx ++ "]"
+
+
+kEq' :: Ctx -> Kind -> Kind -> Result ()
+kEq' ctx KType KType = ok ()
+kEq' ctx KSession KSession = ok ()
+kEq' ctx KState KState = ok ()
+kEq' ctx KShape KShape = ok ()
+kEq' ctx (KDom t1) (KDom t2) = tEq ctx t1 t2
+kEq' ctx (KArr d1 c1) (KArr d2 c2) = do
   kEq ctx d1 d2
   kEq ctx c1 c2
-kEq ctx k1 k2 = raise ("[K-Eq] kind mismatch between " ++ pretty k1 ++ " and " ++ pretty k2)
+kEq' ctx k1 k2 = raise ("[K-Eq] kind mismatch between " ++ pretty k1 ++ " and " ++ pretty k2)
 
 kEqs :: Ctx -> Kind -> [Kind] -> Result ()
 kEqs ctx ks = mapM_ (kEq ctx ks)
@@ -41,8 +46,12 @@ kNEq ctx k1 k2 = do
     Left _ -> ok ()
     Right _ -> raise ("[K-Eq] kind " ++ pretty k1 ++ " cannot be " ++ pretty k2)
 
-tEq :: Ctx -> Type -> Type -> Result ()
-tEq ctx = tEq' ctx []
+tEq ctx t1 t2 = case tEq'' ctx t1 t2 of
+  Right x -> Right x
+  Left err -> Left $ err ++ "\n    equality of " ++ pretty t1 ++ " and " ++ pretty t2 ++ "\n         in [" ++ pretty ctx ++ "]"
+
+tEq'' :: Ctx -> Type -> Type -> Result ()
+tEq'' ctx = tEq' ctx []
 
 tEq' :: Ctx -> [Equiv] -> Type -> Type -> Result ()
 tEq' ctx eqs t t' = do
@@ -155,8 +164,12 @@ ctxUnify' eqs uqs ctx ctx1 ctx2 = do
   ok [ (x , y) | (x , y) <- uqs, x `notElem` map fst ctx1 ]
 
 {- unification for ∃Γ.Σ;T -}
-existEq :: Ctx -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result ()
-existEq ctx = existEq' ctx []
+existEq ctx tri1 tri2 = case existEq'' ctx tri1 tri2 of
+  Right x -> Right x
+  Left err -> Left $ err ++ "\n    equality of " ++ pretty tri1 ++ " and " ++ pretty tri2 ++ "\n         in [" ++ pretty ctx ++ "]"
+
+existEq'' :: Ctx -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result ()
+existEq'' ctx = existEq' ctx []
     
 existEq' :: Ctx -> [Equiv] -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result ()
 existEq' ctx eqs tri1 tri2 = do

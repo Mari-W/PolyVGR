@@ -90,7 +90,7 @@ tryEvalFork p @ (abs, cbs, es) = findEC es isFork <&> \(es1, ce, Fork v, es2) ->
 tryEvalNew :: Program -> Maybe Program
 tryEvalNew p @ (abs, cbs, es) = findEC es isNew <&> \(es1, ce, New t, es2) -> 
     let v = freshVar in
-    (abs ++ [(v, t)], cbs, es1 ++ [mergeExpr ce (Val VUnit)] ++ es2)
+    (abs ++ [(v, EAcc t)], cbs, es1 ++ [mergeExpr ce (Val (VVar v))] ++ es2)
 
 tryEvalReqAcc :: [AccBind] -> Program -> Maybe Program
 tryEvalReqAcc (a @ (x, EAcc s) : xs) p @ (abs, cbs, es) = case findEC2 es (isReq x) (isAcc x) of  

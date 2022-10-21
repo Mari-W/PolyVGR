@@ -79,7 +79,7 @@ instance Pretty Type where
   pp p (SDual ty) = brace p 80 ("~ " ++ pp 80 ty)
   pp p SHEmpty = "𝕀"
   pp p SHSingle = "𝕏"
-  pp p (SHMerge ty ty') = brace p 3 (pp 4 ty ++ " ; " ++ pp 4 ty')
+  pp p (SHMerge ty ty') = brace p (-1) (pp 4 ty ++ " ; " ++ pp 4 ty')
   pp p DEmpty = "∗"
   pp p (DMerge ty ty') = brace p 3 (pp 4 ty ++ " , " ++ pp 4 ty')
   pp p (DProj la ty) = brace p 100 ("π" ++ pp 0 la ++ " " ++ pp 101 ty)

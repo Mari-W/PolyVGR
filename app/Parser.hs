@@ -38,8 +38,8 @@ kwFunArr = string "->" <|> string "→"
 kwCstrArr = string "=>" <|> string "⇒"
 kwTupTimes = char '*' <|> char '×'
 kwLambda = char 'λ' <|> char '𝜆' <|> char '\\'
-kwForall = string "all" <|> string "forall" <|> string "∀"
-kwExists = string "ex" <|> string "exists" <|> string "∃"
+kwForall = string "all"  <* space1 <|> string "forall"  <* space1 <|> string "∀"
+kwExists = string "ex" <* space1 <|> string "exists" <* space1 <|> string "∃"
 kwShEmpty = char 'I' <|> char '𝕀'
 kwShSingle = char 'X' <|> char '𝕏'
 kwTLambda = char 'Λ' <|> char '\\'
@@ -320,7 +320,7 @@ dMerge = do
 
 dProj = do
   l <- lProj
-  spaces
+  space1
   DProj l <$> dom3
 
 state1 =  foldr SSMerge SSEmpty <$> sepBy state2 (spaces *> char ',' <* spaces) <* optional (char ',')

@@ -200,35 +200,48 @@ typeE ctx st (Case v e1 e2) = do
 
 typeP :: Program -> Result ()
 typeP (abs, cbs, es) = do
-  ctx <- typeCA [] abs
-  (ctx', st') <- typeCC ctx SSEmpty cbs
-  st'' <- typeCE ctx' st' es
+  ctx <- typeCA' [] abs
+  (ctx', st') <- typeCC' ctx SSEmpty cbs
+  st'' <- typeCE' ctx' st' es
   tEq ctx' st'' SSEmpty 
+
+
+typeCA' ctx abs = case typeCA ctx abs of
+  Right x -> Right x
+  Left err -> Left $ err ++ "\n    type of " ++ pretty abs ++ "\n         in [" ++ pretty ctx  ++ "]"
 
 typeCA :: Ctx -> [AccBind] -> Result Ctx
 typeCA ctx [] = ok ctx
 typeCA ctx ((s, t) : xs) = case t of
     EAcc ty -> do 
-      kt <- kind ctx t
+      kt <- kind ctx ty
       kEq ctx kt KSession
       ctx' <- (s, t) +. ctx
-      typeCA ctx' xs
+      typeCA' ctx' xs
     _ -> raise ("[T-NuAccess] expected access point binding, got " ++ pretty t)
+
+typeCC' ctx st cbs = case typeCC ctx st cbs of
+  Right x -> Right x
+  Left err -> Left $ err ++ "\n    type of " ++ pretty cbs ++ "\n         in [" ++ pretty ctx  ++ "]"
 
 typeCC :: Ctx -> Type -> [ChanBind] -> Result (Ctx, Type) 
 typeCC ctx st [] = ok (ctx, st)
 typeCC ctx st (((s, s'), SEnd) : xs) = 
   let ctx' = dce ctx [(s, HasKind (KDom SHSingle)), (s', HasKind (KDom SHSingle))] in
-  typeCC ctx' st xs
+  typeCC' ctx' st xs
 typeCC ctx st (((s, s'), t) : xs) = do
   kt <- kind ctx t
   kEq ctx kt KSession
   let ctx' = dce ctx [(s, HasKind (KDom SHSingle)), (s', HasKind (KDom SHSingle))]
-  typeCC ctx' (SSMerge st (SSMerge (SSBind (TVar s) t) (SSBind (TVar s') (SDual t)))) xs
+  typeCC' ctx' (SSMerge st (SSMerge (SSBind (TVar s) t) (SSBind (TVar s') (SDual t)))) xs
+
+typeCE' ctx st cbs = case typeCE ctx st cbs of
+  Right x -> Right x
+  Left err -> Left $ err ++ "\n    type of " ++ pretty cbs ++ "\n         in [" ++ pretty ctx  ++ "]"
 
 typeCE :: Ctx -> Type -> [Expr] -> Result Type
 typeCE ctx st [] = ok st
 typeCE ctx st (e : xs) = do
-  (_, st', _) <- typeE ctx st e
+  (_, st', _) <- typeE' ctx st e
   _ <- stSplitSt ctx st st'
-  typeCE ctx st' xs
+  typeCE' ctx st' xs
