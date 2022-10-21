@@ -4,9 +4,10 @@ import Ast
     ( Label(LRight, LLeft),
       Type(SSMerge, TVar, SEnd, TApp, TLam, EAll, EArr, EChan, EAcc,
            EPair, SSend, SRecv, SChoice, SBranch, SDual, SHMerge, DMerge,
-           DProj, SSBind) )
+           DProj, SSBind, SSEmpty) )
 import Substitution ( subT )
 import Data.Bifunctor ( Bifunctor(bimap) )
+import Data.List (sort)
 
 tNf :: Type -> Type
 {- TC-TApp -}
@@ -43,5 +44,16 @@ tNf (SHMerge t t') = SHMerge (tNf t) (tNf t')
 tNf (DMerge d d') = DMerge (tNf d) (tNf d')
 tNf (DProj l d) = DProj l (tNf d)
 tNf (SSBind t t') = SSBind (tNf t) (tNf t')
-tNf (SSMerge t t') = SSMerge (tNf t) (tNf t')
+tNf ss @ (SSMerge t t') = normalizeSt ss
 tNf t = t
+
+flattenSt :: Type -> [Type]
+flattenSt SSEmpty = []
+flattenSt (SSMerge l r) = flattenSt l ++ flattenSt r
+flattenSt t = [t]
+
+rebuildSt :: [Type] -> Type
+rebuildSt = foldr SSMerge SSEmpty
+
+normalizeSt :: Type -> Type
+normalizeSt = rebuildSt . sort . flattenSt

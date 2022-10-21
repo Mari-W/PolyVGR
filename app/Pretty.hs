@@ -50,7 +50,7 @@ instance Pretty ((String, String), Type) where
 instance Pretty (String, Has) where
   pp p (s, HasType t) = s ++ " : " ++ pp p t
   pp p (s, HasKind k) = s ++ " : " ++ pp p k
-  pp p (s, HasCstr c) = s ++ " : " ++ pp p c
+  pp p (s, HasCstr c) = pp p c
 
 instance Pretty Label where
   pp p LLeft = "₁"

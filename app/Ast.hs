@@ -7,12 +7,12 @@ data Kind
   | KShape
   | KDom Type
   | KArr Kind Kind
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data Label
   = LLeft
   | LRight
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data Type
   = TVar String
@@ -39,7 +39,7 @@ data Type
   | SSEmpty
   | SSBind Type Type
   | SSMerge Type Type
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data Expr 
   = Let String Expr Expr
@@ -56,7 +56,7 @@ data Expr
   | Case Val Expr Expr
   | Close Val
   | New Type
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data Val 
   = VVar String
@@ -65,7 +65,7 @@ data Val
   | VTAbs String Kind [Cstr] Val
   | VChan Type
   | VAbs Type String Type Expr
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 type Cstr = (Type, Type)
 
@@ -73,7 +73,7 @@ data Has
   = HasType Type
   | HasKind Kind
   | HasCstr Cstr
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 type Ctx = [(String, Has)]
 
@@ -84,4 +84,4 @@ type Program = ([AccBind], [ChanBind], [Expr])
 data ExprCtx
   = ECHole   
   | ECLet String ExprCtx Expr
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)

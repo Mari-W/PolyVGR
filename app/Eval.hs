@@ -8,17 +8,19 @@ import Ast
       ExprCtx(..),
       Label(LRight, LLeft),
       Program,
-      Type(TVar, EAcc, SSend, SChoice),
+      Type(TVar, EAcc, SSend, SChoice, SEnd),
       Val(..) )
 import Substitution ( subE, subTV )
 import Data.Foldable ()
 import Typing ( typeP )
 import Result ( ok, Result )
-import Context ( freshVar )
 import Control.Applicative ( Alternative((<|>)) )
 import Data.Maybe ()
 import Data.Functor ( (<&>) )
 import Data.Data ()
+import Context (freshVar)
+import Debug.Trace
+import Pretty
 
 evalV :: Val -> Result Program
 evalV v = evalE (Val v)
@@ -27,6 +29,7 @@ evalE :: Expr -> Result Program
 evalE e = evalP ([], [], [e])
 
 splitExpr :: Expr -> (ExprCtx, Expr)
+splitExpr e @ (Let x (Val v) b) = (ECHole, e)
 splitExpr (Let x e b) = let (ce', e') = splitExpr e in
   (ECLet x ce' b, e')
 splitExpr e = (ECHole, e)
@@ -48,8 +51,8 @@ findEC (e : es) f = let (ce', e') = splitExpr e in
 findEC2 :: [Expr] -> (Expr -> Bool) -> (Expr -> Bool) -> Maybe ([Expr], ExprCtx, Expr, [Expr], ExprCtx, Expr, [Expr])
 findEC2 es f1 f2 = case findEC es f1 of
      Just (es1, ce1, e1, es1') -> case (findEC es1 f2, findEC es1' f2) of
-        (Just (es2, ce2, e2, es2'), Nothing) -> Just (es2, ce2, e2, es2' ++ es1, ce1, e1, es1')
-        (Nothing, Just (es2, ce2, e2, es2')) -> Just (es1, ce1, e1, es1' ++ es2, ce2, e2, es2')
+        (Just (es2, ce2, e2, es2'), Nothing) -> Just (es2, ce2, e2, es2', ce1, e1, es1')
+        (Nothing, Just (es2, ce2, e2, es2')) -> Just (es1, ce1, e1, es2, ce2, e2, es2')
         _ -> Nothing
      Nothing -> Nothing
 
@@ -65,13 +68,16 @@ evalE' e = e
 
 fixEvalEs :: [Expr] -> [Expr]
 fixEvalEs es = let es' = map (mapExprCtx evalE') es in
-  if es == es'  then es' else fixEvalEs es'
+  if es == es' then es' else fixEvalEs es'
 
 evalP :: Program -> Result Program
-evalP p @ (abs, cbs, es) = let es' = fixEvalEs es in
+evalP p @ (abs, cbs, es) = 
+  let es' = fixEvalEs es in
+  let p = (abs, cbs, es') in
   case tryEvalC p of
     Nothing -> ok p
     Just p' -> do
+      {- trace (pretty p') $ typeP p' -}
       typeP p'
       evalP p'
 
@@ -89,17 +95,17 @@ tryEvalFork p @ (abs, cbs, es) = findEC es isFork <&> \(es1, ce, Fork v, es2) ->
 
 tryEvalNew :: Program -> Maybe Program
 tryEvalNew p @ (abs, cbs, es) = findEC es isNew <&> \(es1, ce, New t, es2) -> 
-    let v = freshVar in
+    let v = freshVar "ap" in
     (abs ++ [(v, EAcc t)], cbs, es1 ++ [mergeExpr ce (Val (VVar v))] ++ es2)
 
 tryEvalReqAcc :: [AccBind] -> Program -> Maybe Program
 tryEvalReqAcc (a @ (x, EAcc s) : xs) p @ (abs, cbs, es) = case findEC2 es (isReq x) (isAcc x) of  
-  Just (les, lce, l, mes, rce, r, res) -> let (v, v') = (freshVar, freshVar) in 
+  Just (les, lce, l, mes, rce, r, res) -> let v = freshVar "c" in let v' = freshVar "~c" in 
     (case (l, r) of  
       (Req {}, Acc {}) -> Just (VChan (TVar v), VChan (TVar v'))
       (Acc {}, Req {}) -> Just (VChan (TVar v'), VChan (TVar v))
       _ -> Nothing
-    ) <&> (\(l, r) -> (remove abs a, cbs ++ [((v, v'), s)], les ++ [mergeExpr lce (Val l)] ++ mes ++ [mergeExpr rce (Val r)] ++ res))
+    ) <&> (\(l, r) -> (abs, cbs ++ [((v, v'), s)], les ++ [mergeExpr lce (Val l)] ++ mes ++ [mergeExpr rce (Val r)] ++ res))
   _ -> tryEvalReqAcc xs p
 tryEvalReqAcc _ _ = Nothing
 
@@ -128,12 +134,12 @@ tryEvalSelCase (cb @ ((x, x'), SChoice sl sr) : xs) p @ (abs, cbs, es) = case fi
 tryEvalSelCase _ _ = Nothing
 
 tryEvalClose :: [ChanBind] -> Program -> Maybe Program
-tryEvalClose (cb @ ((x, x'), SChoice sl sr) : xs) p @ (abs, cbs, es) = case findEC2 es (isClose x) (isClose x') of  
+tryEvalClose (cb @ ((x, x'), SEnd) : xs) p @ (abs, cbs, es) = case findEC2 es (isClose x) (isClose x') of  
   Just (les, lce, l, mes, rce, r, res) ->
     (case (l, r) of  
       (Close {}, Close {}) -> Just (VUnit, VUnit)
       _ -> Nothing
-    ) <&> (\(l, r) -> (abs, cbs, les ++ [mergeExpr lce (Val l)] ++ mes ++ [mergeExpr rce (Val r)] ++ res))
+    ) <&> (\(l, r) -> (abs, remove cbs cb, les ++ [mergeExpr lce (Val l)] ++ mes ++ [mergeExpr rce (Val r)] ++ res))
   _ -> tryEvalClose xs p
 tryEvalClose _ _ = Nothing
 

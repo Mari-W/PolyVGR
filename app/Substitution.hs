@@ -128,7 +128,7 @@ subCtx x s ((x2, i) : xs) = do
             HasCstr c -> HasCstr(head (subCstrs x s [c]))
   if x /= x2 then case find (== x2) (freeT [] s) of
     Nothing -> (x2, r) : subCtx x s xs
-    Just str -> let v = freshVar in
+    Just str -> let v = freshVar x2 in
       (v, r) : subCtx x s (renCtx x2 v xs)
   else (x2, r) : xs
 
@@ -147,12 +147,12 @@ subT x s (TApp f a) = TApp (subT x s f) (subT x s a)
 subT x s (TLam x2 k b) = if x == x2 then TLam x2 (subK x s k) b else 
     case find (== x2) (freeT [] s) of
       Nothing -> TLam x2 (subK x s k) (subT x s b)
-      Just _ -> let v = freshVar in
+      Just _ -> let v = freshVar x2 in
         TLam v (subK x s k) (subT x s (renT x2 v b))
 subT x s (EAll x2 k cs t) = if x == x2 then EAll x2 (subK x s k) cs t else
     case find (== x2) (freeT [] s) of
       Nothing -> EAll x2 (subK x s k) (subCstrs x s cs) (subT x s t)
-      Just _ -> let v = freshVar in
+      Just _ -> let v = freshVar x2 in
         EAll v (subK x s k) (subCstrs x s (renCstrs x2 v cs)) (subT x s (renT x2 v t))
 subT x s (EArr st1 t1 ctx st2 t2) = EArr (subT x s st1) (subT x s t1) (subCtx x s ctx) (subT x s st2) (subT x s t2) 
 subT x s (EChan d) = EChan (subT x s d)
@@ -162,12 +162,12 @@ subT x s (EPair l r) = EPair (subT x s l) (subT x s r)
 subT x s (SSend x2 k st t c) =  if x == x2 then SSend x2 (subK x s k) st t (subT x s c) else 
     case find (== x2) (freeT [] s) of
       Nothing -> SSend x2 (subK x s k) (subT x s st) (subT x s t) (subT x s c)
-      Just str ->  let v = freshVar in
+      Just str ->  let v = freshVar x2 in
         SSend v (subK x s k) (subT x s (renT x2 v st)) (subT x s  (renT x2 v t)) (subT x s c)
 subT x s (SRecv x2 k st t c) = if x == x2 then SRecv x2 (subK x s k) st t (subT x s c) else 
     case find (== x2) (freeT [] s) of
       Nothing -> SRecv x2 (subK x s k) (subT x s st) (subT x s t) (subT x s c)
-      Just str -> let v = freshVar in
+      Just str -> let v = freshVar x2 in
         SRecv v (subK x s k) (subT x s (renT x2 v st)) (subT x s  (renT x2 v t)) (subT x s c)
 subT x s (SChoice l r) = SChoice (subT x s l) (subT x s r)
 subT x s (SBranch l r) = SBranch (subT x s l) (subT x s r)
@@ -187,7 +187,7 @@ subE :: String -> Val -> Expr -> Expr
 subE x s (Let x2 e1 e2) = if x == x2 then Let x2 (subE x s e1) e2 else 
     case find (== x2) (freeV [] s) of
       Nothing -> Let x2 (subE x s e1) (subE x s e2)
-      Just str -> let v = freshVar in
+      Just str -> let v = freshVar x2 in
         Let v (subE x s e1) (subE x s (renE x2 v e2))
 subE x s (Val v) = Val (subV x s v) 
 subE x s (Proj l v) = Proj l (subV x s v)
@@ -212,7 +212,7 @@ subV x s (VChan t) = VChan t
 subV x s (VAbs st x2 t e) = if x == x2 then VAbs st x2 t e else 
     case find (== x2) (freeV [] s) of
       Nothing -> VAbs st x2 t (subE x s e)
-      Just str -> let v = freshVar in
+      Just str -> let v = freshVar x2 in
         VAbs st v t (subE x s (renE x2 v e))
 
 subTE :: String -> Type -> Expr -> Expr
@@ -238,7 +238,7 @@ subTV x s (VPair v1 v2) = VPair (subTV x s v1) (subTV x s v2)
 subTV x s (VTAbs x2 k cs v) = if x == x2 then VTAbs x2 (subK x s k) cs v else 
     case find (== x2) (freeT [] s) of
       Nothing -> VTAbs x2 (subK x s k) (subCstrs x s cs) (subTV x s v)
-      Just str -> let f = freshVar in
+      Just str -> let f = freshVar x2 in
         VTAbs f (subK x s k) (subCstrs x s (renCstrs x2 f cs)) (subTV x s (renV x2 f v))
 subTV x s (VChan t) = VChan t
 subTV x s (VAbs st x2 t e) = VAbs (subT x s st) x2 (subT x s t) (subTE x s e) 

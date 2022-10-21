@@ -8,6 +8,7 @@ import Data.List (tails)
 import System.Random ( newStdGen, Random(randomRs) )
 import System.IO.Unsafe ( unsafePerformIO )
 import Pretty ( Pretty(pretty) )
+import Data.IORef
 
 (+*) :: (String, Kind) -> Ctx -> Result Ctx
 (s, k) +* ctx = do
@@ -31,20 +32,28 @@ c +- ctx = do
 (*?) :: String -> Ctx -> Result Kind
 s *? ctx = case find (\(s', _) -> s' == s) (rev ctx) of
   Just (_, HasKind k) -> ok k
-  _ -> raise ("[CTX] could not resolve kind " ++ s ++ " in " ++ pretty ctx)
+  _ -> raise $ "[CTX] could not resolve kind of " ++ s ++ " in [" ++ pretty ctx ++ "]"
 
 (.?) :: String -> Ctx -> Result Type
 s .? ctx = case find (\(s', _) -> s' == s) (rev ctx) of
   Just (_, HasType t) -> ok t
-  _ -> raise ("[CTX] could not resolve type " ++ s ++ " in " ++ pretty ctx)
+  _ -> raise $ "[CTX] could not resolve type of " ++ s ++ " in [" ++ pretty ctx ++ "]"
 
 (?!) :: String -> Ctx -> Result ()
 s ?! ctx = case find (\(s', _) -> s' == s) (rev ctx) of
-  Just _ -> raise ("[CTX] variable " ++ s ++ " already defined")
+  Just _ -> raise $ "[CTX] variable " ++ s ++ " already defined"
   _ -> ok ()
 
-freshVar :: String
-freshVar = "fresh" ++ take 5 (randomRs ('A','Z') $ unsafePerformIO newStdGen)
+{-# NOINLINE globalVar #-}
+globalVar :: IORef Integer
+globalVar = unsafePerformIO (newIORef 0)
+
+{-# INLINE freshVar #-}
+freshVar :: String -> String
+freshVar n = unsafePerformIO $ do
+  s <- readIORef globalVar
+  writeIORef globalVar (s + 1)
+  return $ "_" ++ n ++ show s
 
 rev :: Ctx -> Ctx
 rev = foldl (flip (:)) []

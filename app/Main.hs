@@ -8,6 +8,7 @@ import Eval
 import Parser (parseFile)
 import Text.Parsec
 import System.Environment
+import Context (freshVar)
 
 main :: IO ()
 main = do

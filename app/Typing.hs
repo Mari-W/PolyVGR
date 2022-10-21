@@ -21,6 +21,7 @@ import Result ( ok, raise, Result )
 import State ( stSplitDom, stSplitSt )
 import Substitution ( renTM, subCstrs, subT )
 import Pretty ( Pretty(pretty) )
+import Debug.Trace
 
 typeV' ctx v = case typeV ctx v of
   Right x -> Right x
@@ -64,7 +65,7 @@ typeV ctx (VAbs st s t e) = do
 
 typeE' ctx st e = case typeE ctx st e of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    type of " ++ pretty e ++ "\n         in [" ++ pretty ctx ++ "]"
+  Left err -> Left $ err ++ "\n    type of " ++ pretty e ++ "\n         in [" ++ pretty ctx  ++ "]\n            {" ++ pretty st ++ "}"
 
 typeE :: Ctx -> Type -> Expr -> Result (Ctx, Type, Type)
 {- T-Let -}
@@ -116,15 +117,15 @@ typeE ctx st (Req v) = do
   tv <- typeV' ctx v
   case tv of 
     EAcc t -> do
-      let x = freshVar
+      let x = freshVar "c"
       ok ([(x, HasKind (KDom SHSingle))], SSMerge st (SSBind (TVar x) t), EChan (TVar x))
     _ -> raise ("[T-Request] expected access point to request to, got " ++ pretty tv)
 {- T-Accept -}
 typeE ctx st (Acc v) = do
   tv <- typeV' ctx v
   case tv of 
-    EAcc t -> let x = freshVar in
-      ok ([(x, HasKind (KDom SHSingle))], SSMerge st (SSBind (TVar x) (SDual t)), EChan (TVar x))
+    EAcc t -> let x = freshVar "c" in
+      ok ([(x, HasKind (KDom SHSingle))], SSMerge st (SSBind (TVar x) (tNf (SDual t))), EChan (TVar x))
     _ -> raise ("[T-Accept] expected access point to request to, got " ++ pretty tv)
 {- T-Send -}
 typeE ctx st (Send v1 v2) = do 
@@ -144,7 +145,7 @@ typeE ctx st (Send v1 v2) = do
               st' <- stSplitSt ctx r st1'
               ok ([], SSMerge st' (SSBind d1 s), EUnit)
             _ -> raise ("[T-Send] can only abstract over domains, got " ++ pretty kd2)
-        _ -> raise ("[T-Send] expected send channel (i.e !s) along a state including their binding, got " ++ pretty tv1 ++ " and " ++ pretty st)
+        _ -> raise ("[T-Send] expected send channel (i.e !s) along a state including its binding, got " ++ pretty tv1 ++ " and " ++ pretty st)
     _ -> raise ("[T-Send] expected channel to send on got " ++ pretty tv2)
 {- T-Receive -}
 typeE ctx st (Recv v) = do 
@@ -156,13 +157,14 @@ typeE ctx st (Recv v) = do
           kd1 <- kind' ctx d1
           kEq ctx kd1 (KDom SHSingle)
           ok ([(x, HasKind kd2)], SSMerge r (SSMerge st1 (SSBind d1 s)), t1)
-        _ -> raise ("[T-Recv] expected receive channel (i.e ?s) along a state including their binding, got " ++ pretty tv ++ " and " ++ pretty st)
+        _ -> raise ("[T-Recv] expected receive channel (i.e ?s) along a state including its binding, got " ++ pretty tv ++ " and " ++ pretty st)
     _ -> raise ("[T-Send] expected channel to receive on, got " ++ pretty tv)
 {- T-Fork -}
 typeE ctx st (Fork v) = do 
   tv <- typeV' ctx v
   case tv of
-    EArr st1 EUnit ctx2 SSEmpty EUnit -> do
+    EArr st1 EUnit ctx2 st2 EUnit -> do
+      tEq ctx st2 SSEmpty 
       st' <- stSplitSt ctx st st1
       ok ([], st', EUnit)
     _ -> raise ("[T-Fork] expected Process (i.e (Σ; Unit -> Γ. ·; Unit) to fork, got " ++ pretty tv)
@@ -173,7 +175,7 @@ typeE ctx st (Close v) = do
     EChan d1 -> case stSplitDom ctx st d1 of 
         Just (r , SEnd) -> do
           ok ([], r, EUnit)
-        _ -> raise ("[T-Close] expected closable channel (i.e End) along their state binding, got " ++ pretty tv ++ " and " ++ pretty st)
+        _ -> raise ("[T-Close] expected closable channel (i.e End) along its state binding, got " ++ pretty tv ++ " and " ++ pretty st)
     _ -> raise ("[T-Close] expected channel to close, got " ++ pretty tv)
 {- T-Select -}
 typeE ctx st (Sel l v) = do 
@@ -183,7 +185,7 @@ typeE ctx st (Sel l v) = do
         Just (r , SChoice cl cr) -> case l of 
             LLeft -> ok ([], SSMerge r (SSBind d1 cl), EUnit)
             LRight -> ok ([], SSMerge r (SSBind d1 cr), EUnit)
-        _ -> raise ("[T-Select] expected selectable channel (i.e s + s') along their state binding, got " ++ pretty tv ++ " and " ++ pretty st)
+        _ -> raise ("[T-Select] expected selectable channel (i.e s + s') along its state binding, got " ++ pretty tv ++ " and " ++ pretty st)
     _ -> raise ("[T-Select] expected channel to select from, got " ++ pretty tv)
 {- T-Case -}
 typeE ctx st (Case v e1 e2) = do 
@@ -195,7 +197,7 @@ typeE ctx st (Case v e1 e2) = do
           tri2 @ (ctxr, str, tr) <- typeE' ctx (SSMerge r (SSBind d1 s2)) e2
           existEq ctx tri1 tri2 
           ok (ctxl, stl, tl)
-        _ -> raise ("[T-Select] expected branched channel (i.e s & s') along a state including their binding, got " ++ pretty tv ++ " and " ++ pretty st)
+        _ -> raise ("[T-Select] expected branched channel (i.e s & s') along a state including its binding, got " ++ pretty tv ++ " and " ++ pretty st)
     _ -> raise ("[T-Select] expected channel to case split on got " ++ pretty tv)
 
 typeP :: Program -> Result ()
@@ -204,7 +206,6 @@ typeP (abs, cbs, es) = do
   (ctx', st') <- typeCC' ctx SSEmpty cbs
   st'' <- typeCE' ctx' st' es
   tEq ctx' st'' SSEmpty 
-
 
 typeCA' ctx abs = case typeCA ctx abs of
   Right x -> Right x
@@ -222,18 +223,15 @@ typeCA ctx ((s, t) : xs) = case t of
 
 typeCC' ctx st cbs = case typeCC ctx st cbs of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    type of " ++ pretty cbs ++ "\n         in [" ++ pretty ctx  ++ "]"
+  Left err -> Left $ err ++ "\n    type of " ++ pretty cbs ++ "\n         in [" ++ pretty ctx  ++ "]\n            {" ++ pretty st ++ "}"
 
 typeCC :: Ctx -> Type -> [ChanBind] -> Result (Ctx, Type) 
 typeCC ctx st [] = ok (ctx, st)
-typeCC ctx st (((s, s'), SEnd) : xs) = 
-  let ctx' = dce ctx [(s, HasKind (KDom SHSingle)), (s', HasKind (KDom SHSingle))] in
-  typeCC' ctx' st xs
 typeCC ctx st (((s, s'), t) : xs) = do
   kt <- kind ctx t
   kEq ctx kt KSession
   let ctx' = dce ctx [(s, HasKind (KDom SHSingle)), (s', HasKind (KDom SHSingle))]
-  typeCC' ctx' (SSMerge st (SSMerge (SSBind (TVar s) t) (SSBind (TVar s') (SDual t)))) xs
+  typeCC' ctx' (SSMerge st (SSMerge (SSBind (TVar s) t) (SSBind (TVar s') (tNf (SDual t))))) xs
 
 typeCE' ctx st cbs = case typeCE ctx st cbs of
   Right x -> Right x

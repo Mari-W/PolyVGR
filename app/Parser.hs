@@ -14,7 +14,6 @@ import Result (Result, ok, raise)
 import Text.ParserCombinators.Parsec
     ( alphaNum, letter, parse, many, many1, optional, space, noneOf, option, sepBy1, unexpected, eof, (<|>), sepBy, oneOf )
 import qualified Text.ParserCombinators.Parsec.Token as Token
-import Debug.Trace ( trace )
 import Data.List (isInfixOf)
 import Text.Parsec.Language (emptyDef)
 

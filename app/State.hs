@@ -6,6 +6,7 @@ import Result ( ok, raise, Result )
 import Equality ( tEq ) 
 import Constraints ( ce )
 import Pretty ( Pretty(pretty) )
+import Debug.Trace
 
 type Proj = (Type, Type)
 
@@ -31,26 +32,20 @@ stSplitDom ctx (SSBind d1 s) d2 = case tEq ctx d1 d2 of
     Right _ -> Just (SSEmpty, s)
 stSplitDom ctx (SSMerge l r) d = case (stSplitDom ctx l d, stSplitDom ctx r d) of 
     (Nothing, Nothing) -> Nothing
-    (Just (re, l), _) -> Just (SSMerge re r, l)
-    (_, Just (re, r)) -> Just (SSMerge l re, r)
+    (Just (re, s), _) -> Just (SSMerge re r, s)
+    (_, Just (re, s)) -> Just (SSMerge l re, s)
 stSplitDom ctx t d = Nothing 
 
-splitSt :: Type -> Result [Proj]
-splitSt SSEmpty = ok []
-splitSt (SSBind d st) = ok [(d, st)]
-splitSt (SSMerge l r) = (++) <$> splitSt l <*> splitSt r
-splitSt t = raise ("[T-Split] expected state to split, got " ++ pretty t)
-
 stSplitApp :: Ctx -> Type -> Type -> Maybe Type
-stSplitApp ctx (TApp fd d) (TApp fd2 d2) =case tEq ctx fd fd2 of 
+stSplitApp ctx (TApp fd d) (TApp fd2 d2) = case tEq ctx fd fd2 of 
     Left _ -> Nothing
     Right _ -> case tEq ctx d d2 of
       Left s -> Nothing
       Right x0 -> Just SSEmpty 
 stSplitApp ctx (SSMerge l r) d = case (stSplitApp ctx l d, stSplitApp ctx r d) of 
     (Nothing, Nothing) -> Nothing
-    (Just s, _) -> Just (SSMerge s r)
-    (_, Just s) -> Just (SSMerge l s)
+    (Just re, _) -> Just (SSMerge re r)
+    (_, Just re) -> Just (SSMerge l re)
 stSplitApp ctx t d = Nothing 
 
 stSplitSt :: Ctx -> Type -> Type -> Result Type
