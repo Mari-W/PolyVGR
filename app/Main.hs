@@ -20,8 +20,11 @@ run = do
     _ -> raise "expected path to file as the only argument"
   p <- parseFile arg1
   t <- liftEither $ typeE' [] SSEmpty p
+  liftIO $ putStrLn ("-----------::          expr           ::-----------\n\n" ++ pretty p ++
+                     "\n\n-----------::        has type         ::-----------\n\n" ++ pretty t ++
+                     "\n\n-----------::      communication      ::-----------\n")
   (_, _, e) <- evalE p
-  liftIO $ putStrLn (pretty e) 
+  liftIO $ putStrLn "-----------::          done           ::-----------" 
 
 main :: IO ()
 main = do

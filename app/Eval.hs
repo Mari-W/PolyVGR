@@ -18,7 +18,7 @@ import Control.Applicative ( Alternative((<|>)) )
 import Data.Maybe ()
 import Data.Functor ( (<&>) )
 import Data.Data ()
-import Context (freshVar)
+import Context (freshVar, freshVar2)
 import Debug.Trace
 import Pretty
 import Control.Monad.Error.Class (liftEither)
@@ -73,13 +73,13 @@ fixEvalEs es = let es' = map (mapExprCtx evalE') es in
   if es == es' then es' else fixEvalEs es'
 
 evalP :: Program -> ResultT IO Program
-evalP p @ (abs, cbs, es) = 
-  let es' = fixEvalEs es in
-  let p = (abs, cbs, es') in
+evalP p @ (abs, cbs, es) = do
+  let es' = fixEvalEs es 
+  let p = (abs, cbs, es') 
+  liftIO $ putStrLn $ pretty p ++ "\n---------------------------------------------------\n"
   case tryEvalC p of
     Nothing -> ok p
-    Just p' -> do
-      liftIO $ putStrLn $ pretty p'
+    Just p' -> do 
       liftEither $ typeP p'
       evalP p'
 
@@ -102,7 +102,7 @@ tryEvalNew p @ (abs, cbs, es) = findEC es isNew <&> \(es1, ce, New t, es2) ->
 
 tryEvalReqAcc :: [AccBind] -> Program -> Maybe Program
 tryEvalReqAcc (a @ (x, EAcc s) : xs) p @ (abs, cbs, es) = case findEC2 es (isReq x) (isAcc x) of  
-  Just (les, lce, l, mes, rce, r, res) -> let v = freshVar "c" in let v' = freshVar "~c" in 
+  Just (les, lce, l, mes, rce, r, res) -> let (v, v') = freshVar2 "c" in
     (case (l, r) of  
       (Req {}, Acc {}) -> Just (VChan (TVar v), VChan (TVar v'))
       (Acc {}, Req {}) -> Just (VChan (TVar v'), VChan (TVar v))

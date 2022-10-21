@@ -1,2 +1,12 @@
-let acc = new End in
-  unit
+let acc = new !(ex a : Dom(I).{}; Unit).End in
+let accThread = \({}; u: Unit). 
+  let c = request acc in 
+  let u2 = send unit on c in 
+  close c in
+let reqTread = \({}; u: Unit). 
+  let c = accept acc in 
+  let u2 = receive c in 
+  close c in
+let x = fork accThread in
+let x2 = fork reqTread in
+unit

@@ -45,6 +45,7 @@ freeT bs (EArr st1 t1 ctx st2 t2) = let bs' = map fst ctx ++ bs in
 freeT bs (EChan d) = freeT bs d
 freeT bs (EAcc t) = freeT bs t
 freeT bs EUnit = []
+freeT bs EInt = []
 freeT bs (EPair l r) = freeT bs l ++ freeT bs r
 freeT bs (SSend x k st t c) = let bs' = x : bs in
   freeT bs c ++ freeT bs' t ++ freeT bs' st ++ freeK bs k
@@ -85,6 +86,7 @@ freeV bs (VVar x) = case find (== x) bs of
   Nothing -> [x]
   Just _ -> [] 
 freeV bs VUnit = []
+freeV bs (VInt i) = []
 freeV bs (VPair v1 v2) = freeV bs v1 ++ freeV bs v2
 freeV bs (VTAbs x k cs v) = freeV (x : bs) v
 freeV bs (VChan t) = []
@@ -158,6 +160,7 @@ subT x s (EArr st1 t1 ctx st2 t2) = EArr (subT x s st1) (subT x s t1) (subCtx x 
 subT x s (EChan d) = EChan (subT x s d)
 subT x s (EAcc t) = EAcc (subT x s t)
 subT x s EUnit = EUnit 
+subT x s EInt = EInt 
 subT x s (EPair l r) = EPair (subT x s l) (subT x s r)
 subT x s (SSend x2 k st t c) =  if x == x2 then SSend x2 (subK x s k) st t (subT x s c) else 
     case find (== x2) (freeT [] s) of
@@ -206,6 +209,7 @@ subE x s (New t) = New t
 subV :: String -> Val -> Val -> Val
 subV x s (VVar x2) = if x == x2 then s else VVar x2
 subV x s VUnit = VUnit
+subV x s (VInt i) = VInt i
 subV x s (VPair v1 v2) = VPair (subV x s v1) (subV x s v2)
 subV x s (VTAbs x2 k cs v) = VTAbs x2 k cs (subV x s v)
 subV x s (VChan t) = VChan t
@@ -234,6 +238,7 @@ subTE x s (New t) = New (subT x s t)
 subTV :: String -> Type -> Val -> Val
 subTV x s (VVar x2) = VVar x2
 subTV x s VUnit = VUnit
+subTV x s (VInt i) = VInt i
 subTV x s (VPair v1 v2) = VPair (subTV x s v1) (subTV x s v2)
 subTV x s (VTAbs x2 k cs v) = if x == x2 then VTAbs x2 (subK x s k) cs v else 
     case find (== x2) (freeT [] s) of

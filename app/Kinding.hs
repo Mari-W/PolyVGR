@@ -6,6 +6,7 @@ import Ast
       Kind(..),
       Label(LRight, LLeft),
       Type(..) )
+  
 import Context ( (*?), (+*), (+-*), dce, gd, isDomCtx, rev )
 import Equality ( kEq, kEqs, kNEq )
 import Result ( ok, raise, Result )
@@ -112,6 +113,8 @@ kind ctx (EAcc s) = do
   ok KType
 {- K-Unit -}
 kind ctx EUnit = ok KType
+{- K-Int -}
+kind ctx EInt = ok KType
 {- K-Pair -}
 kind ctx (EPair l r) = do
   kl <- kind' ctx l

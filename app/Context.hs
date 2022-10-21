@@ -12,18 +12,18 @@ import Data.IORef
 
 (+*) :: (String, Kind) -> Ctx -> Result Ctx
 (s, k) +* ctx = do
-  s ?! ctx
+  {- TODO  s ?! ctx -}
   ok (ctx ++ [(s, HasKind k)])
 
 (+.) :: (String, Type) -> Ctx -> Result Ctx
 (s, t) +. ctx = do
-  s ?! ctx
+  {- TODO s ?! ctx -}
   ok (ctx ++ [(s, HasType t)])
 
 (+-) :: Cstr -> Ctx -> Ctx
 c +- ctx = do
   ctx ++ [("__constraint", HasCstr c)]
-  
+
 (+-*) :: [Cstr] -> Ctx -> Ctx
 [] +-* ctx = ctx
 (x : xs) +-* ctx = let ctx' = x +- ctx in
@@ -55,13 +55,21 @@ freshVar n = unsafePerformIO $ do
   writeIORef globalVar (s + 1)
   return $ "_" ++ n ++ show s
 
+{-# INLINE freshVar2 #-}
+freshVar2 :: String -> (String, String)
+freshVar2 n = unsafePerformIO $ do
+  s <- readIORef globalVar
+  writeIORef globalVar (s + 1)
+  return ("_" ++ n ++ show s, "_~" ++ n ++ show s)
+
+
 rev :: Ctx -> Ctx
 rev = foldl (flip (:)) []
 
 isDomCtx :: Ctx -> Result ()
 isDomCtx [] = ok ()
-isDomCtx (x : xs) = case x of  
-  (_, HasKind (KDom _)) -> isDomCtx xs 
+isDomCtx (x : xs) = case x of
+  (_, HasKind (KDom _)) -> isDomCtx xs
   _ -> raise ("[CTX] found non domain " ++ pretty x ++ " in ctx")
 
 gd :: Ctx -> Ctx

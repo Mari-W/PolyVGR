@@ -10,7 +10,7 @@ import Ast
       Label(LRight, LLeft),
       Program,
       Type(SDual, EPair, EAll, SSend, SRecv, EArr, SChoice, EUnit, EChan,
-           SBranch, SSEmpty, EAcc, SEnd, SHSingle, SSMerge, SSBind, TVar),
+           SBranch, SSEmpty, EAcc, SEnd, SHSingle, SSMerge, SSBind, TVar, EInt),
       Val(..) )
 import Constraints ( ce )
 import Context ( (+*), (+-*), (+.), (.?), dce, freshVar )
@@ -34,6 +34,8 @@ typeV ctx (VVar x) = do
   ok t
 {- T-Unit -}
 typeV ctx VUnit = ok EUnit
+{- T-Nat -}
+typeV ctx (VInt i)  = ok EInt
 {- T-Pair -}
 typeV ctx (VPair l r) = do
   tl <- typeV' ctx l

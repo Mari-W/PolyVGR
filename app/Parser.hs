@@ -8,8 +8,8 @@ import Ast
       Label(LRight, LLeft),
       Type(SSEmpty, SSMerge , TApp, TLam, EAll, EArr, EChan, EAcc, EUnit, EPair,
            SSend, SRecv, SChoice, SBranch, SEnd, SDual, SHEmpty, SHSingle,
-           SHMerge, DEmpty, DProj, SSBind, DMerge, TVar),
-      Val(VPair, VVar, VChan, VAbs, VTAbs, VUnit) )
+           SHMerge, DEmpty, DProj, SSBind, DMerge, TVar, EInt),
+      Val(VPair, VVar, VChan, VAbs, VTAbs, VUnit, VInt) )
 import Result (Result, ok, raise, ResultT)
 import Text.ParserCombinators.Parsec
     ( alphaNum, letter, parse, many, many1, optional, space, noneOf, option, sepBy1, unexpected, eof, (<|>), sepBy, oneOf )
@@ -61,7 +61,7 @@ commaSep1 = Token.commaSep1 lexer
 commaSep = Token.commaSep lexer
 semiSep1 = Token.semiSep1 lexer
 whiteSpace = Token.whiteSpace lexer
-
+integer    = Token.integer lexer 
 
 {- keywords -}
 
@@ -168,7 +168,7 @@ kBind = do
 et1 = eAll <|> et2
 et2 = foldr1 EPair <$> sepBy1 et3 kwTupTimes
 et3 = foldr1 TApp <$> many1 et4
-et4 = eChan <|> eUnit <|> eAcc <|> parens et1
+et4 = eChan <|> eUnit <|> eInt <|> eAcc <|> parens et1
 
 eAll = do
   kwForall
@@ -221,6 +221,11 @@ eAcc = EAcc <$> brackets session1
 eUnit = do
   reserved "Unit"
   return EUnit
+
+eInt = do
+  reserved "Int"
+  return EInt
+
 
 domStTy = do
   kwExists
@@ -399,6 +404,8 @@ vUnit = do
   reserved "unit"
   return VUnit
 
+vInt =  VInt <$> integer
+
 vPair = angles $ do
   v <- val1
   reservedOp ","
@@ -415,4 +422,4 @@ expr2 = expr3 <|> (do
 expr3 = fork <|> acc <|> req <|> send <|> recv <|> sel <|> case1 <|> close <|> new <|> parens expr1
 
 val1 = vAbs <|> vTAbs <|> val2
-val2 = vChan <|> vUnit <|> vPair <|> parens val1 <|> vVar
+val2 = vChan <|> vUnit <|> vPair <|> parens val1 <|> vInt <|> vVar

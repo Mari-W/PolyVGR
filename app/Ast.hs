@@ -23,6 +23,7 @@ data Type
   | EChan Type
   | EAcc Type
   | EUnit
+  | EInt
   | EPair Type Type
   | SSend String Kind Type Type Type
   | SRecv String Kind Type Type Type
@@ -60,6 +61,7 @@ data Expr
 
 data Val 
   = VVar String
+  | VInt Integer
   | VUnit
   | VPair Val Val
   | VTAbs String Kind [Cstr] Val
