@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Equality where
 
 import Ast

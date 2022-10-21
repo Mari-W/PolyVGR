@@ -1,15 +1,19 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Result where
+import Control.Monad.Except (ExceptT, MonadError (throwError))
 
 type Result r = Either String r
 
-raise :: String -> Result r
-raise = Left
+type ResultT m r = ExceptT String m r
 
-ok :: r -> Result r
-ok = Right
+raise :: MonadError String m => String -> m r
+raise = throwError 
 
-todo :: Result r
+ok :: MonadError String m => r -> m r
+ok = return
+
+todo :: MonadError String m => m r
 todo = raise "unimplemented" 
 
-unreachable :: Result r
+unreachable ::  MonadError String m => m r
 unreachable = raise "unreachable"

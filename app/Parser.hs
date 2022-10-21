@@ -10,20 +10,21 @@ import Ast
            SSend, SRecv, SChoice, SBranch, SEnd, SDual, SHEmpty, SHSingle,
            SHMerge, DEmpty, DProj, SSBind, DMerge, TVar),
       Val(VPair, VVar, VChan, VAbs, VTAbs, VUnit) )
-import Result (Result, ok, raise)
+import Result (Result, ok, raise, ResultT)
 import Text.ParserCombinators.Parsec
     ( alphaNum, letter, parse, many, many1, optional, space, noneOf, option, sepBy1, unexpected, eof, (<|>), sepBy, oneOf )
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import Data.List (isInfixOf)
 import Text.Parsec.Language (emptyDef)
+import Control.Monad.IO.Class (liftIO)
 
 
-parseFile :: String -> IO (Result Expr)
+parseFile :: String -> ResultT IO Expr
 parseFile file = do
-  prog <- readFile file
+  prog <- liftIO $ readFile file
   case parse (whiteSpace *> expr1 <* whiteSpace <* eof) "" prog of
-    Left pe -> print pe >> fail "parse error"
-    Right ex -> return (ok ex)
+    Left pe -> liftIO $ print pe >> fail "parse error"
+    Right ex -> return ex
 
 parseString :: String -> Result Expr
 parseString s = do

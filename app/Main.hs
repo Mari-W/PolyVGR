@@ -1,30 +1,31 @@
 module Main where
 
-import Ast
-import Kinding
-import Typing
-import Pretty 
-import Eval
+import Ast ( Type(SSEmpty) )
+import Typing ( typeE' )
+import Pretty ( Pretty(pretty) )
+import Eval ( evalE )
 import Parser (parseFile)
-import Text.Parsec
-import System.Environment
+import System.Environment ( getArgs )
 import Context (freshVar)
+import Result (ResultT, raise)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Error.Class (liftEither)
+import Control.Monad.Except (runExceptT)
+
+run :: ResultT IO ()
+run = do
+  args <- liftIO getArgs
+  arg1 <- case args of
+    [a] -> return a
+    _ -> raise "expected path to file as the only argument"
+  p <- parseFile arg1
+  t <- liftEither $ typeE' [] SSEmpty p
+  (_, _, e) <- evalE p
+  liftIO $ putStrLn (pretty e) 
 
 main :: IO ()
 main = do
-  args <- getArgs
-  case args of 
-    [s] -> do
-      p <- parseFile s
-      case p of
-        Left str -> putStrLn ("Parse Error\n" ++  str)
-        Right ex -> do
-          putStrLn ("Parsed: " ++ pretty ex)
-          case typeE' [] SSEmpty ex of
-            Left str -> putStrLn ("Type Error\n" ++  str)
-            Right (_, _, t) -> do
-              putStrLn ("Type: " ++ pretty t)
-              case evalE ex of
-                Left str ->  putStrLn ("Eval Error\n" ++  str)
-                Right (_, _, ts) ->  putStrLn ("Remaining Threads: " ++ pretty ts)
-    _ -> error "expected path to file as the only argument"
+  res <- runExceptT run
+  case res of    
+    Left s -> putStrLn s
+    Right x0 -> return ()

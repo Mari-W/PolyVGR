@@ -13,7 +13,7 @@ import Ast
 import Substitution ( subE, subTV )
 import Data.Foldable ()
 import Typing ( typeP )
-import Result ( ok, Result )
+import Result ( ok, Result, ResultT )
 import Control.Applicative ( Alternative((<|>)) )
 import Data.Maybe ()
 import Data.Functor ( (<&>) )
@@ -21,11 +21,13 @@ import Data.Data ()
 import Context (freshVar)
 import Debug.Trace
 import Pretty
+import Control.Monad.Error.Class (liftEither)
+import Control.Monad.IO.Class (liftIO)
 
-evalV :: Val -> Result Program
+evalV :: Val -> ResultT IO Program
 evalV v = evalE (Val v)
 
-evalE :: Expr -> Result Program
+evalE :: Expr -> ResultT IO Program
 evalE e = evalP ([], [], [e])
 
 splitExpr :: Expr -> (ExprCtx, Expr)
@@ -70,15 +72,15 @@ fixEvalEs :: [Expr] -> [Expr]
 fixEvalEs es = let es' = map (mapExprCtx evalE') es in
   if es == es' then es' else fixEvalEs es'
 
-evalP :: Program -> Result Program
+evalP :: Program -> ResultT IO Program
 evalP p @ (abs, cbs, es) = 
   let es' = fixEvalEs es in
   let p = (abs, cbs, es') in
   case tryEvalC p of
     Nothing -> ok p
     Just p' -> do
-      {- trace (pretty p') $ typeP p' -}
-      typeP p'
+      liftIO $ putStrLn $ pretty p'
+      liftEither $ typeP p'
       evalP p'
 
 tryEvalC :: Program -> Maybe Program
