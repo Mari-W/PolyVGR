@@ -1,0 +1,20 @@
+let send0 = Λ(c : Dom(X)).
+  Λ(σ : Session).
+    λ({}; x : Unit).
+      λ({c ↦ !(∃α : Dom(X ; X).{ }; Unit).σ}; y : Chan c).
+        send x on y
+in
+
+let gsend = 
+  Λ(n : Shape). Λ(α : Dom n).
+  Λ(Σ : Dom n -> State).Λ (T : Dom n -> Type).
+  Λ(c : Dom X).(α # c) => Λ(σ : Session). 
+  λ({}; x : T α). λ({Σ α, c -> !(∃α : Dom n. {Σ α}; T α).σ}; c : Chan c).
+    send x on c
+in 
+
+let send01 = gsend [I] in
+let send02 = send01 [*] in
+let send03 = send02 [λ(x : Dom I). {}] in
+let send0 = send03 [λ(x : Dom I). Int] in
+unit

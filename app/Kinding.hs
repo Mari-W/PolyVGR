@@ -6,7 +6,6 @@ import Ast
       Kind(..),
       Label(LRight, LLeft),
       Type(..) )
-  
 import Context ( (*?), (+*), (+-*), dce, gd, isDomCtx, rev )
 import Equality ( kEq, kEqs, kNEq )
 import Result ( ok, raise, Result )
@@ -73,7 +72,7 @@ kind ctx (TLam s k t) = do
       ctx' <- (s, k) +* gd ctx
       cwf ctx'
       kt <- kind' ctx' t
-      kEqs ctx kt [KType, KState]
+      
       ok (KArr k kt)
     _ -> raise ("[K-Lam] can only abstract over domains, got " ++ pretty k)
 {- K-All -}

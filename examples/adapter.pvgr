@@ -1,0 +1,12 @@
+\({}; f : all (n1 : Shape). all (S1 : Dom n1 -> State).
+          all (n2 : Shape). all (n : Shape).
+          all (S2 : Dom (n ; n2) -> State). all (T2 : Dom (n ; n2) -> Type).
+          all (a1 : Dom n1).  all (a2 : Dom n2).
+          all (y : Dom X). (a1 # y, a2 # y) =>
+          all (s : Session). all (s1 : Session).
+            ({}; ({S1 a1, y -> s}; Chan y -> ex a : Dom (n).{S2 (a, a2), y -> s1}; T2 (a, a2)) 
+              -> 
+            {}; ({S1 a1, y -> !(ex a : Dom (I).{}; Int).s}; Chan y -> ex a : Dom n.{S2 (a, a2), y -> s1}; T2 (a, a2)))).
+  \({}; c : TODO).
+    let u = send 42 on c in
+    f c

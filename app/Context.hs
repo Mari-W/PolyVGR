@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Context where
 
 import Ast
@@ -30,12 +31,12 @@ c +- ctx = do
   xs +-* ctx'
 
 (*?) :: String -> Ctx -> Result Kind
-s *? ctx = case find (\(s', _) -> s' == s) (rev ctx) of
+s *? ctx = case find (\(s', _) -> s' == s) (filter (\case (str, HasKind _) -> True; _ -> False ) (rev ctx)) of
   Just (_, HasKind k) -> ok k
   _ -> raise $ "[CTX] could not resolve kind of " ++ s ++ " in [" ++ pretty ctx ++ "]"
 
 (.?) :: String -> Ctx -> Result Type
-s .? ctx = case find (\(s', _) -> s' == s) (rev ctx) of
+s .? ctx = case find (\(s', _) -> s' == s) (filter (\case (str, HasType _) -> True; _ -> False ) (rev ctx)) of
   Just (_, HasType t) -> ok t
   _ -> raise $ "[CTX] could not resolve type of " ++ s ++ " in [" ++ pretty ctx ++ "]"
 

@@ -12,11 +12,12 @@ import Ast
       Val(VPair, VVar, VChan, VAbs, VTAbs, VUnit, VInt) )
 import Result (Result, ok, raise, ResultT)
 import Text.ParserCombinators.Parsec
-    ( alphaNum, letter, parse, many, many1, optional, space, noneOf, option, sepBy1, unexpected, eof, (<|>), sepBy, oneOf )
+    ( alphaNum, letter, parse, many, many1, optional, space, noneOf, option, sepBy1, unexpected, eof, (<|>), sepBy, oneOf, try, lookAhead )
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import Data.List (isInfixOf)
 import Text.Parsec.Language (emptyDef)
 import Control.Monad.IO.Class (liftIO)
+import Text.Parsec.Combinator (optionMaybe)
 
 
 parseFile :: String -> ResultT IO Expr
@@ -40,15 +41,15 @@ langDef = emptyDef {
   Token.commentLine = "//",
   Token.identStart = letter,
   Token.identLetter = alphaNum,
-  Token.reservedOpNames = ["->", "→", "=>", "⇒", "λ", "𝜆", "\\", "𝕀", "𝕏", "π₁", "π₂", "π", "Λ",  "·", "*", "+", "⊕", "↦", ";", ":", "×", "#", "~"],
-  Token.reservedNames  = ["Type", "Session", "State", "Shape", "Dom", "left", "right", "proj1", "proj2", "all", "forall", "ex", "exists", "Chan", "Unit", "I", "X", "let", "in", "fork", "accept", "request", "send", "on", "receive", "select",  "case", "of", "close", "new", "chan", "unit"],
+  Token.reservedOpNames = ["->", "→", "=>", "⇒", "λ", "𝜆", "\\", "𝕀", "𝕏", "π₁", "π₂", "π", "Λ",  "·", "*", "+", "⊕", "↦", ";", ":", "×", "#", "~", "."],
+  Token.reservedNames  = ["Type", "Session", "State", "Shape", "Dom", "left", "right", "proj1", "proj2", "all", "forall", "ex", "exists", "Chan", "Unit", "Int", "I", "X", "let", "in", "fork", "accept", "request", "send", "on", "receive", "select",  "case", "of", "close", "new", "chan", "unit"],
   Token.caseSensitive = True
 }
 
 lexer = Token.makeTokenParser langDef
 
 identifier = Token.identifier lexer
-reserved  = Token.reserved lexer 
+reserved  = Token.reserved lexer
 reservedOp = Token.reservedOp lexer
 parens = Token.parens lexer
 braces = Token.braces lexer
@@ -61,7 +62,8 @@ commaSep1 = Token.commaSep1 lexer
 commaSep = Token.commaSep lexer
 semiSep1 = Token.semiSep1 lexer
 whiteSpace = Token.whiteSpace lexer
-integer    = Token.integer lexer 
+integer = Token.integer lexer
+symbol = Token.symbol lexer
 
 {- keywords -}
 
@@ -73,7 +75,7 @@ kwForall = reserved "all" <|> reserved "forall" <|> reservedOp "∀"
 kwExists = reserved "ex" <|> reserved "exists" <|> reservedOp "∃"
 kwShEmpty = reservedOp "I" <|> reservedOp "𝕀"
 kwShSingle = reservedOp "X" <|> reservedOp "𝕏"
-kwTLambda = reservedOp "Λ" <|> reservedOp "\\"
+kwTLambda = reservedOp "Λ" <|> reservedOp "\\\\"
 kwProj1 = reservedOp "π₁" <|> reserved "proj1"
 kwProj2 = reservedOp "π₂" <|> reserved "proj2"
 kwLab1 = reservedOp "1" <|> reserved "left"
@@ -148,14 +150,14 @@ tLam = do
   kwLambda
   (id, d) <- parens domBind
   reservedOp "."
-  c <- state1 <|> et1
+  c <- braces state1 <|> et1
   return (TLam id d c)
 
 cstr = do
-  t <- dom1
+  t1 <- dom2
   reservedOp "#"
-  t_ <- dom1
-  return (t, t)
+  t2 <- dom2
+  return (t1, t2)
 cstrs = do
   commaSep1 cstr
 
@@ -166,15 +168,14 @@ kBind = do
   return (id, k)
 
 et1 = eAll <|> et2
-et2 = foldr1 EPair <$> sepBy1 et3 kwTupTimes
-et3 = foldr1 TApp <$> many1 et4
-et4 = eChan <|> eUnit <|> eInt <|> eAcc <|> parens et1
+et2 = foldr1 EPair <$> sepBy1 et4 kwTupTimes
+et4 = eChan <|> eUnit <|> eInt <|> eAcc <|> eArr <|> try (parens et1) <|> tApp
 
 eAll = do
   kwForall
   (id, k) <- parens kBind
   reservedOp "."
-  cs <- option [] (do
+  cs <- option [] (try $ do
       cs <- parens cstrs
       kwCstrArr
       return cs)
@@ -189,7 +190,7 @@ ctxBinds = commaSep1 ctxBind
 ctxEmpty = do
   kwCtxEmpty
   return []
-ctx1 = ctxEmpty <|> ctxBinds 
+ctx1 = ctxEmpty <|> ctxBinds
 
 stTy = do
   st <- braces state1
@@ -206,11 +207,15 @@ ctxStTy = do
   (st, t) <- stTy
   return (ctx, st, t)
 
-eArr = parens $ do
+isArr = try $ lookAhead $ do
+    symbol "("
+    symbol "{"
+
+eArr = isArr *> parens (do
   (st1, t1) <- stTy
   kwFunArr
   (ctx, st2, t2) <- ctxStTy
-  return (EArr st1 t1 ctx st2 t2)
+  return (EArr st1 t1 ctx st2 t2))
 
 eChan = do
   reserved "Chan"
@@ -261,7 +266,7 @@ sDual = do
   SDual <$> session4
 
 shape1 = foldr1 SHMerge <$> semiSep1 shape2
-shape2 = shEmpty <|> shSingle <|> tVar <|> parens shape1 
+shape2 = shEmpty <|> shSingle <|> tVar <|> parens shape1
 
 shEmpty = do
   kwShEmpty
@@ -277,7 +282,7 @@ shMerge = do
 
 dom1 = foldr1 DMerge <$> commaSep1 dom2
 dom2 = dProj <|> dom3
-dom3 = dEmpty <|> tVar <|> parens dom1 
+dom3 = dEmpty <|> tVar <|> parens dom1
 
 dEmpty = do
   reservedOp "*"
@@ -297,7 +302,7 @@ state1 = foldr SSMerge SSEmpty <$> commaSep state2 <* optional (reservedOp ",")
 state2 = do
   d <- dom3
   let pb = SSBind d <$ kwBind <*> session1
-  case d of 
+  case d of
     TVar s -> TApp d <$> dom3 <|> pb
     _ -> pb
 
@@ -315,11 +320,6 @@ let1 = do
 proj = do
   l <- lProj
   Proj l <$> val1
-
-aapp = do
-  v <- val2
-  t <- brackets (tLam <|> dom1 <|> shape1 <|> session1)
-  return (AApp v t)
 
 fork = do
   reserved "fork"
@@ -411,15 +411,23 @@ vPair = angles $ do
   reservedOp ","
   VPair v <$> val1
 
-expr1 = let1 <|> expr2 
-expr2 = expr3 <|> (do 
+aapp v = do
+  t <- brackets (tLam <|> dom1 <|> shape1 <|> session1)
+  return $ AApp v t
+
+expr1 = let1 <|> expr2
+expr2 = expr3 <|> (do
   l <- many1 val1
-  case l of 
-    [] -> undefined 
-    [v] -> return $ Val v
+  case l of
+    [] -> undefined
+    [v] -> do
+      mt <- optionMaybe $ brackets (tLam <|> dom1 <|> shape1 <|> session1)
+      case mt of
+        Nothing -> return $ Val v
+        Just t -> return $ AApp v t
     [v1, v2] -> return $ App v1 v2
     _ -> unexpected "nested applications not allowed in A-normal form")
-expr3 = fork <|> acc <|> req <|> send <|> recv <|> sel <|> case1 <|> close <|> new <|> parens expr1
+expr3 = fork <|> acc <|> req <|> send <|> recv <|> sel <|> case1 <|> close <|> new <|> proj <|> parens expr1
 
 val1 = vAbs <|> vTAbs <|> val2
 val2 = vChan <|> vUnit <|> vPair <|> parens val1 <|> vInt <|> vVar

@@ -76,7 +76,7 @@ instance Pretty Type where
   pp i p (EChan ty) = indent i $ brace p 100 ("Chan " ++ pp 0 101 ty)
   pp i p (EAcc ty) = indent i $ brace p 100 ("[" ++ pp 0 0 ty ++ "]")
   pp i p EUnit = indent i "Unit"
-  pp i p EInt = indent i "Nat"
+  pp i p EInt = indent i "Int"
   pp i p (EPair ty ty') = indent i $ brace p (-1) (pp 0 0 ty ++ " × " ++ pp 0 0 ty')
   pp i p (SSend s ki st ty ty2) = indent i $ brace p 100 ("!(∃" ++ s ++ " : " ++ pp 0 0 ki ++ ". " ++ pp 0 0 st ++ "). " ++ pp 0 100 ty2)
   pp i p (SRecv s ki st ty ty2) = indent i $ brace p 100 ("?(∃" ++ s ++ " : " ++ pp 0 0 ki ++ ". " ++ pp 0 0 st ++ "). " ++ pp 0 100 ty2)
@@ -92,6 +92,9 @@ instance Pretty Type where
   pp i p (DProj la ty) = indent i $ brace p 100 ("π" ++ pp 0 0 la ++ " " ++ pp 0 101 ty)
   pp i p SSEmpty = "·"
   pp i p (SSBind ty ty') = indent i $ brace p 4 (pp 0 5 ty ++ " ↦ " ++ pp 0 5 ty')
+  pp i p (SSMerge SSEmpty SSEmpty ) = indent i $ brace p 3 "{}"
+  pp i p (SSMerge SSEmpty ty') = indent i $ brace p 3 (pp 0 3 ty')
+  pp i p (SSMerge ty SSEmpty) = indent i $ brace p 3 (pp 0 3 ty)
   pp i p (SSMerge ty ty') = indent i $ brace p 3 (pp 0 3 ty ++ " , " ++ pp 0 3 ty')
 
 instance Pretty Expr where
@@ -99,7 +102,7 @@ instance Pretty Expr where
   pp i p (Val val) = indent i $ pp 0 p val
   pp i p (Proj la val) = indent i $ brace p 100 ("𝜋" ++ pp 0 0 la ++ " " ++ pp 0 101 val)
   pp i p (App val val') = indent i $ brace p 100 (pp 0 100 val ++ " " ++ pp 0 101 val')
-  pp i p (AApp val ty) = indent i $ brace p 100 (pp 0 100 val ++ "[" ++ pp 0 0 ty ++ "]")
+  pp i p (AApp val ty) = indent i $ brace p 100 (pp 0 100 val ++ " [" ++ pp 0 0 ty ++ "]")
   pp i p (Fork val) = indent i $ brace p 100  ("fork " ++ pp 0 101 val)
   pp i p (Acc val) = indent i $ brace p 100 ("accept " ++ pp 0 101 val)
   pp i p (Req val) = indent i $ brace p 100 ("request " ++ pp 0 101 val)
