@@ -23,7 +23,7 @@ instance Pretty a => Pretty [a] where
   pp i p (x : xs) = pp i p x ++ ", " ++ pp 0 p xs
 
 brace p1 p2 s = if p1 > p2 then "(" ++ s ++ ")" else s
-indent i s = concat (replicate i "  ") ++ s
+indent i s = concat (replicate 0 "  ") ++ s
 
 instance Pretty Kind where
   pp i p KType = indent i "Type"
@@ -45,7 +45,7 @@ enumerate = zip [0..]
 instance Pretty Program where
   pp i p (abs, cbs, es) = (if null abs then "" else "Access Points:\n" ++ concatMap (\a -> pp 0 0 a ++ "\n") abs) ++ 
                           (if null cbs then "" else "\nChannels:\n" ++ concatMap (\c -> pp 0 0 c ++ "\n") cbs) ++ 
-                          (if null es then "" else  "\nThreads:\n" ++ concatMap (\(i, a) -> "----  [" ++ show (i + 1) ++ "] ----\n" ++  pp 0 0 a ++ "\n") (enumerate es))
+                          (if null es then "" else  "\nThreads:\n" ++ concatMap (\(i, a) -> "---- [" ++ show (i + 1) ++ "] ----\n" ++  pp 0 0 a ++ "\n") (enumerate es))
 
 instance Pretty (String, Type) where
   pp i p (s, t) = indent i $ "𝜈" ++ s ++ " : " ++ pp 0 0 t
@@ -98,7 +98,7 @@ instance Pretty Type where
   pp i p (SSMerge ty ty') = indent i $ brace p 3 (pp 0 3 ty ++ " , " ++ pp 0 3 ty')
 
 instance Pretty Expr where
-  pp i p (Let s ex ex') = indent i $ brace p 1 ("let " ++ s ++ " = " ++ pp 0 0 ex ++ " in\n" ++ pp i 1 ex')
+  pp i p (Let s ex ex') = indent i $ brace p 1 ("let " ++ s ++ " = " ++ pp i 0 ex ++ " in\n" ++ pp i 1 ex')
   pp i p (Val val) = indent i $ pp 0 p val
   pp i p (Proj la val) = indent i $ brace p 100 ("𝜋" ++ pp 0 0 la ++ " " ++ pp 0 101 val)
   pp i p (App val val') = indent i $ brace p 100 (pp 0 100 val ++ " " ++ pp 0 101 val')
@@ -118,7 +118,7 @@ instance Pretty Val where
   pp i p VUnit = indent i "unit"
   pp i p (VInt j) = indent i (show j)
   pp i p (VPair val val') = indent i $ brace p (-1) (pp 0 0 val ++ " , " ++ pp 0 0 val')
-  pp i p (VTAbs s ki [] val) = indent i $ brace p 1 ("Λ(" ++ s ++ " : " ++ pp 0 0 ki ++ ").\n" ++ pp (i+1) 1 val)
-  pp i p (VTAbs s ki xs val) = indent i $ brace p 1 ("Λ(" ++ s ++ " : " ++ pp 0 0 ki ++ "). (" ++ pp 0 0 xs ++ ") =>\n" ++ pp (i+1) 1 val)
+  pp i p (VTAbs s ki [] val) = indent i $ brace p 1 ("Λ(" ++ s ++ " : " ++ pp 0 0 ki ++ ").\n" ++ pp i 1 val)
+  pp i p (VTAbs s ki xs val) = indent i $ brace p 1 ("Λ(" ++ s ++ " : " ++ pp 0 0 ki ++ "). (" ++ pp 0 0 xs ++ ") =>\n" ++ pp i 1 val)
   pp i p (VChan ty) = indent i $ brace p 100 ("chan " ++ pp 0 101 ty)
-  pp i p (VAbs ty s ty' ex) = indent i $ brace p 1 ("λ(" ++ pp 0 0 ty ++ "; " ++ s ++ " : " ++ pp 0 0 ty' ++ ").\n" ++ pp (i+1) 1 ex)
+  pp i p (VAbs ty s ty' ex) = indent i $ brace p 1 ("λ(" ++ pp 0 0 ty ++ "; " ++ s ++ " : " ++ pp 0 0 ty' ++ ").\n" ++ pp i 1 ex)

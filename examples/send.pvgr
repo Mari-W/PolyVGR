@@ -13,7 +13,7 @@ let gsend =
     send x on c
 in 
 
-let send01 = gsend [I] in
+let send01 = gsend [X] in
 let send02 = send01 [*] in
 let send03 = send02 [λ(x : Dom I). {}] in
 let send0 = send03 [λ(x : Dom I). Int] in

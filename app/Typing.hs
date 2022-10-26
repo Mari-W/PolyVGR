@@ -13,7 +13,7 @@ import Ast
            SBranch, SSEmpty, EAcc, SEnd, SHSingle, SSMerge, SSBind, TVar, EInt),
       Val(..) )
 import Constraints ( ce )
-import Context ( (+*), (+-*), (+.), (.?), dce, freshVar )
+import Context ( dce, freshVar, tRes, kExt, csExt, tExt )
 import Conversion ( tNf )
 import Equality ( existEq, kEq, tEq, tUnify )
 import Kinding ( kwf, cwf, kind', kind )
@@ -25,13 +25,11 @@ import Debug.Trace
 
 typeV' ctx v = case typeV ctx v of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    type of " ++ pretty v ++ "\n         in [" ++ pretty ctx ++ "]"
+  Left err -> Left $ err ++ err  ++ "\n\n-----------::        type of         ::-----------\n---- value ----\n" ++ pretty v ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
 
 typeV :: Ctx -> Val -> Result Type
 {- T-Var -}
-typeV ctx (VVar x) = do 
-  t <- x .? ctx
-  ok t
+typeV ctx (VVar x) = tRes ctx x
 {- T-Unit -}
 typeV ctx VUnit = ok EUnit
 {- T-Nat -}
@@ -43,8 +41,8 @@ typeV ctx (VPair l r) = do
   ok (EPair tl tr)
 {- T-TAbs -}
 typeV ctx (VTAbs s k cs v) = do
-  ctx' <- (s, k) +* ctx
-  let ctx'' = cs +-* ctx'
+  let ctx' = kExt ctx (s, k)
+  let ctx'' = csExt ctx' cs
   cwf ctx''
   tv <- typeV' ctx'' v
   kt <- kind' ctx (EAll s k cs tv)
@@ -58,7 +56,7 @@ typeV ctx (VChan d) = do
     _ -> raise ("[T-Chan] expected single domain, got " ++ pretty d')
 {- T-Abs -}
 typeV ctx (VAbs st s t e) = do
-  ctx' <- (s, t) +. ctx
+  let ctx' = tExt ctx (s, t)
   cwf ctx'
   (ctx', st', te) <- typeE' ctx' st e
   ke <- kind' ctx (EArr st t ctx' st' te)
@@ -67,16 +65,16 @@ typeV ctx (VAbs st s t e) = do
 
 typeE' ctx st e = case typeE ctx st e of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    type of " ++ pretty e ++ "\n         in [" ++ pretty ctx  ++ "]\n            {" ++ pretty st ++ "}"
+  Left err -> Left $ err  ++ "\n\n-----------::        type of         ::-----------\n----  expr  ----\n" ++ pretty e ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n{" ++ pretty st ++ "}"
 
 typeE :: Ctx -> Type -> Expr -> Result (Ctx, Type, Type)
 {- T-Let -}
 typeE ctx st (Let s e1 e2) = do
   (ctx1, ss1, t1) <- typeE' ctx st e1
   let ctx' = dce ctx ctx1
-  ctx' <- (s, t1) +. ctx'
-  cwf ctx'
-  (ctx2, ss2, t2) <- typeE' ctx' ss1 e2 
+  let ctx'' = tExt ctx' (s, t1)
+  cwf ctx''
+  (ctx2, ss2, t2) <- typeE' ctx'' ss1 e2 
   ok (ctx1 ++ ctx2, ss2, t2)
 {- T-Val -}
 typeE ctx st (Val v) = do
@@ -211,7 +209,7 @@ typeP (abs, cbs, es) = do
 
 typeCA' ctx abs = case typeCA ctx abs of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    type of " ++ pretty abs ++ "\n         in [" ++ pretty ctx  ++ "]"
+  Left err -> Left $ err  ++ "\n\n-----------::        type of         ::-----------\n---- binds ----\n" ++ pretty abs ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
 
 typeCA :: Ctx -> [AccBind] -> Result Ctx
 typeCA ctx [] = ok ctx
@@ -219,13 +217,13 @@ typeCA ctx ((s, t) : xs) = case t of
     EAcc ty -> do 
       kt <- kind ctx ty
       kEq ctx kt KSession
-      ctx' <- (s, t) +. ctx
+      let ctx' = tExt ctx (s, t)
       typeCA' ctx' xs
     _ -> raise ("[T-NuAccess] expected access point binding, got " ++ pretty t)
 
 typeCC' ctx st cbs = case typeCC ctx st cbs of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    type of " ++ pretty cbs ++ "\n         in [" ++ pretty ctx  ++ "]\n            {" ++ pretty st ++ "}"
+  Left err -> Left $err  ++ "\n\n-----------::        type of         ::-----------\n---- binds ----\n" ++ pretty cbs ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n{" ++ pretty st ++ "}"
 
 typeCC :: Ctx -> Type -> [ChanBind] -> Result (Ctx, Type) 
 typeCC ctx st [] = ok (ctx, st)
@@ -235,9 +233,9 @@ typeCC ctx st (((s, s'), t) : xs) = do
   let ctx' = dce ctx [(s, HasKind (KDom SHSingle)), (s', HasKind (KDom SHSingle))]
   typeCC' ctx' (SSMerge st (SSMerge (SSBind (TVar s) t) (SSBind (TVar s') (tNf (SDual t))))) xs
 
-typeCE' ctx st cbs = case typeCE ctx st cbs of
+typeCE' ctx st es = case typeCE ctx st es of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    type of " ++ pretty cbs ++ "\n         in [" ++ pretty ctx  ++ "]"
+  Left err -> Left $ err  ++ "\n\n-----------::        type of         ::-----------\n---- exprs ----\n" ++ pretty es ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n{" ++ pretty st ++ "}"
 
 typeCE :: Ctx -> Type -> [Expr] -> Result Type
 typeCE ctx st [] = ok st

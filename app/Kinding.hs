@@ -6,7 +6,7 @@ import Ast
       Kind(..),
       Label(LRight, LLeft),
       Type(..) )
-import Context ( (*?), (+*), (+-*), dce, gd, isDomCtx, rev )
+import Context ( dce, gd, isDomCtx, rev, kRes, kExt, csExt )
 import Equality ( kEq, kEqs, kNEq )
 import Result ( ok, raise, Result )
 import Constraints ()
@@ -47,12 +47,13 @@ cwf' ((x, h) : xs) = case h of
       _ -> raise ("[CF-ConsCstr] expected domains as constraints, got " ++ pretty kl ++ " and " ++ pretty kr)   
 
 kind' ctx t = case kind ctx t of
-  Right x -> Right x
-  Left err -> Left $ err ++ "\n    kind of " ++ pretty t ++ " \n         in [" ++ pretty ctx ++ "]"
+  Right x -> Right x    
+  Left err -> Left $ err  ++ "\n\n-----------::        kind of         ::-----------\n----  type  ----\n" ++ pretty t ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
+
 
 kind :: Ctx -> Type -> Result Kind
 {- K-Var -}
-kind ctx (TVar s) = s *? ctx
+kind ctx (TVar s) = kRes ctx s
 {- K-App -}
 kind ctx (TApp f a) = do
   kf <- kind' ctx f
@@ -69,7 +70,7 @@ kind ctx (TLam s k t) = do
     KDom sh -> do
       ksh <- kind' ctx sh
       kEq ctx ksh KShape
-      ctx' <- (s, k) +* gd ctx
+      let ctx' = kExt (gd ctx) (s, k)
       cwf ctx'
       kt <- kind' ctx' t
       
@@ -79,8 +80,8 @@ kind ctx (TLam s k t) = do
 kind ctx (EAll s k cs t) = do
   kNEq ctx k KType 
   kNEq ctx k KState 
-  ctx' <- (s, k) +* ctx
-  let ctx'' = cs +-* ctx'
+  let ctx' = kExt ctx (s, k)
+  let ctx'' = csExt ctx' cs
   cwf ctx''
   kt <- kind' ctx'' t
   kEq ctx'' kt KType
@@ -129,7 +130,7 @@ kind ctx (SSend s k ss t c) = do
     KDom sh -> do
       ksh <- kind' ctx sh
       kEq ctx ksh KShape
-      ctx' <- (s, k) +* gd ctx
+      let ctx' = kExt (gd ctx) (s, k)
       cwf ctx'
       kss <- kind' ctx' ss
       kEq ctx kss KState
@@ -145,7 +146,7 @@ kind ctx (SRecv s k ss t c) = do
     KDom sh -> do
       ksh <- kind' ctx sh
       kEq ctx ksh KShape
-      ctx' <- (s, k) +* gd ctx
+      let ctx' = kExt (gd ctx) (s, k) 
       cwf ctx'
       kss <- kind' ctx' ss
       kEq ctx kss KState

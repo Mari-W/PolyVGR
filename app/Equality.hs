@@ -8,7 +8,6 @@ import Ast
       Type(SSMerge, TVar, TApp, TLam, EArr, EAll, EChan, EAcc, EUnit,
            SSend, SRecv, SChoice, SBranch, SEnd, SDual, SHEmpty, SHSingle,
            SHMerge, DEmpty, DMerge, DProj, SSEmpty, SSBind, EInt) )
-import Context ( (+-*), (.?) )
 import Data.Bifunctor (Bifunctor (bimap))
 import Result ( ok, raise, unreachable, Result )
 import Data.Foldable ( find )
@@ -19,12 +18,13 @@ import Control.Monad ( join )
 import Data.Either ( isLeft )
 import Data.Tuple ( swap )
 import Pretty ( Pretty(pretty) )
+import Context (csExt, tRes)
 
 type Equiv = (String, String)
 
 kEq ctx k1 k2 = case kEq' ctx k1 k2 of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    equality of " ++ pretty k1 ++ " and " ++ pretty k2 ++ "\n         in [" ++ pretty ctx ++ "]"
+  Left err -> Left $ err ++ "\n\n-----------::      equality of       ::-----------\n----  left  ----\n" ++ pretty k1 ++ "\n---- right ----\n" ++ pretty k2 ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
 
 
 kEq' :: Ctx -> Kind -> Kind -> Result ()
@@ -39,18 +39,18 @@ kEq' ctx (KArr d1 c1) (KArr d2 c2) = do
 kEq' ctx k1 k2 = raise ("[K-Eq] kind mismatch between " ++ pretty k1 ++ " and " ++ pretty k2)
 
 kEqs :: Ctx -> Kind -> [Kind] -> Result ()
-kEqs ctx k ks = if all (isLeft . kEq ctx k) ks then raise ("[K-Eq] kind mismatch between " ++ pretty k ++ " and " ++ pretty ks) else ok ()
+kEqs ctx k ks = if all (isLeft . kEq ctx k) ks then raise ("[K-Eq] kind " ++ pretty k ++ " needs to be one of " ++ pretty ks) else ok ()
 
 kNEq :: Ctx -> Kind -> Kind -> Result ()
 kNEq ctx k1 k2 = do
   case kEq ctx k1 k2 of
     Left _ -> ok ()
-    Right _ -> raise ("[K-Eq] kind " ++ pretty k1 ++ " cannot be " ++ pretty k2)
+    Right _ -> raise ("[K-Eq] kind " ++ pretty k1 ++ " is not allowed to be " ++ pretty k2)
 
 tEq ctx t1 t2 = case tEq'' ctx t1 t2 of
-  Right x -> Right x
-  Left err -> Left $ err ++ "\n    equality of " ++ pretty t1 ++ " and " ++ pretty t2 ++ "\n         in [" ++ pretty ctx ++ "]"
-
+  Right x -> Right x       
+  Left err -> Left $ err ++ "\n\n-----------::      equality of       ::-----------\n----  left  ----\n" ++ pretty t1 ++ "\n---- right ----\n" ++ pretty t2 ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
+ 
 tEq'' :: Ctx -> Type -> Type -> Result ()
 tEq'' ctx = tEq' ctx []
 
@@ -59,7 +59,7 @@ tEq' ctx eqs t t' = do
   l <- tUnify ctx eqs (tNf t) (tNf t')
   if null l then ok ()
   else raise ("[T-Eq] type mismatch between " ++ pretty t ++ " and " ++
-              pretty t' ++ ", the following variables should be equal: " ++ show l)
+              pretty t' ++ ", the following variables should be equal but aren't: " ++ show l)
 
 uqsConsistent :: [Equiv] -> Result ()
 uqsConsistent uqs = case ["\n  " ++ x ++ " is required to be both " ++ y ++ " and " ++ y' |
@@ -87,9 +87,9 @@ tUnify ctx eqs (EArr st1 t1 ctx1 st1' t1') (EArr st2 t2 ctx2 st2' t2') = do
 tUnify ctx eqs (EAll s k cs t) (EAll s' k' cs' t') = do
   kEq ctx k k'
   let cs' = renCstrsM eqs cs'
-  let ctx' = cs +-* ctx
+  let ctx' = csExt ctx cs
   ce ctx' cs'
-  let ctx'' = cs' +-* ctx
+  let ctx'' = csExt ctx cs'
   ce ctx'' cs
   tUnify ctx' ((s, s') : eqs) t t'
 tUnify ctx eqs (EChan t) (EChan t') = tUnify ctx eqs t t'
@@ -145,11 +145,11 @@ ctxUnifyH :: [Equiv] ->  [Equiv] -> Ctx -> Ctx -> Ctx -> Result [Result ()]
 ctxUnifyH eqs uqs ctx [] ctx2 = ok []
 ctxUnifyH eqs uqs ctx ((x, HasType t) : xs) ctx2 = case find (\(x', y') -> x == x') uqs of
   Nothing -> do
-    t' <- x .? ctx2
+    t' <- tRes ctx2 x
     xs' <- ctxUnifyH eqs uqs ctx xs ctx2
     ok (tEq' ctx eqs t t' : xs')
   Just (_, y) -> do
-    t' <- y .? ctx2
+    t' <- tRes ctx2 y
     xs' <- ctxUnifyH eqs uqs ctx xs ctx2
     ok (tEq' ctx eqs t t' : xs')
 ctxUnifyH _ _ _ _ _ = raise "[T-Unify] expected context with only dom bindings"
@@ -168,7 +168,7 @@ ctxUnify' eqs uqs ctx ctx1 ctx2 = do
 {- unification for ∃Γ.Σ;T -}
 existEq ctx tri1 tri2 = case existEq'' ctx tri1 tri2 of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n    equality of " ++ pretty tri1 ++ " and " ++ pretty tri2 ++ "\n         in [" ++ pretty ctx ++ "]"
+  Left err -> Left $ err  ++ "\n\n-----------::      equality of       ::-----------\n----  left  ----\n" ++ pretty tri2 ++ "\n---- right ----\n" ++ pretty tri2 ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
 
 existEq'' :: Ctx -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result ()
 existEq'' ctx = existEq' ctx []
@@ -177,7 +177,7 @@ existEq' :: Ctx -> [Equiv] -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result (
 existEq' ctx eqs tri1 tri2 = do
   l <- existUnify' ctx eqs tri1 tri2
   if null l then ok ()else raise ("[T-Eq] type mismatch between " ++ pretty tri1 ++ " and " ++
-                                  pretty tri2 ++ ", the following variables should be equal: " ++ show l)
+                                  pretty tri2 ++ ", the following variables should be equal but aren't: " ++ show l)
 
 existUnify' :: Ctx -> [Equiv] -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result [Equiv]
 existUnify' ctx eqs (ctx1, st1, t1) (ctx2, st2, t2) = do

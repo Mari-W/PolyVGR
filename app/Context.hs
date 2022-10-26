@@ -11,39 +11,28 @@ import System.IO.Unsafe ( unsafePerformIO )
 import Pretty ( Pretty(pretty) )
 import Data.IORef
 
-(+*) :: (String, Kind) -> Ctx -> Result Ctx
-(s, k) +* ctx = do
-  {- TODO  s ?! ctx -}
-  ok (ctx ++ [(s, HasKind k)])
+kExt :: Ctx -> (String, Kind) -> Ctx
+kExt ctx (s, k) = ctx ++ [(s, HasKind k)]
 
-(+.) :: (String, Type) -> Ctx -> Result Ctx
-(s, t) +. ctx = do
-  {- TODO s ?! ctx -}
-  ok (ctx ++ [(s, HasType t)])
+tExt :: Ctx -> (String, Type) -> Ctx
+tExt ctx (s, t) = ctx ++ [(s, HasType t)]
 
-(+-) :: Cstr -> Ctx -> Ctx
-c +- ctx = do
+cExt :: Ctx ->  Cstr -> Ctx
+cExt ctx c = do
   ctx ++ [("__constraint", HasCstr c)]
 
-(+-*) :: [Cstr] -> Ctx -> Ctx
-[] +-* ctx = ctx
-(x : xs) +-* ctx = let ctx' = x +- ctx in
-  xs +-* ctx'
+csExt :: Ctx -> [Cstr] -> Ctx
+csExt = foldl cExt
 
-(*?) :: String -> Ctx -> Result Kind
-s *? ctx = case find (\(s', _) -> s' == s) (filter (\case (str, HasKind _) -> True; _ -> False ) (rev ctx)) of
+kRes :: Ctx -> String -> Result Kind
+kRes ctx s = case find (\(s', _) -> s' == s) (filter (\case (str, HasKind _) -> True; _ -> False ) (rev ctx)) of
   Just (_, HasKind k) -> ok k
-  _ -> raise $ "[CTX] could not resolve kind of " ++ s ++ " in [" ++ pretty ctx ++ "]"
+  _ -> raise $ "[CTX] could not resolve kind of " ++ s
 
-(.?) :: String -> Ctx -> Result Type
-s .? ctx = case find (\(s', _) -> s' == s) (filter (\case (str, HasType _) -> True; _ -> False ) (rev ctx)) of
+tRes :: Ctx -> String -> Result Type
+tRes ctx s = case find (\(s', _) -> s' == s) (filter (\case (str, HasType _) -> True; _ -> False ) (rev ctx)) of
   Just (_, HasType t) -> ok t
-  _ -> raise $ "[CTX] could not resolve type of " ++ s ++ " in [" ++ pretty ctx ++ "]"
-
-(?!) :: String -> Ctx -> Result ()
-s ?! ctx = case find (\(s', _) -> s' == s) (rev ctx) of
-  Just _ -> raise $ "[CTX] variable " ++ s ++ " already defined"
-  _ -> ok ()
+  _ -> raise $ "[CTX] could not resolve type of " ++ s
 
 {-# NOINLINE globalVar #-}
 globalVar :: IORef Integer
@@ -62,7 +51,6 @@ freshVar2 n = unsafePerformIO $ do
   s <- readIORef globalVar
   writeIORef globalVar (s + 1)
   return ("_" ++ n ++ show s, "_~" ++ n ++ show s)
-
 
 rev :: Ctx -> Ctx
 rev = foldl (flip (:)) []
