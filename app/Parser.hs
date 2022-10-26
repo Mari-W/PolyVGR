@@ -12,7 +12,8 @@ import Ast
       Val(VPair, VVar, VChan, VAbs, VTAbs, VUnit, VInt) )
 import Result (Result, ok, raise, ResultT)
 import Text.ParserCombinators.Parsec
-    ( alphaNum, letter, parse, many, many1, optional, space, noneOf, option, sepBy1, unexpected, eof, (<|>), sepBy, oneOf, try, lookAhead )
+    ( alphaNum, letter, parse, many, many1, optional, space, noneOf,
+      option, sepBy1, unexpected, eof, (<|>), sepBy, oneOf, try, lookAhead )
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import Data.List (isInfixOf)
 import Text.Parsec.Language (emptyDef)
@@ -41,8 +42,20 @@ langDef = emptyDef {
   Token.commentLine = "//",
   Token.identStart = letter,
   Token.identLetter = alphaNum,
-  Token.reservedOpNames = ["->", "→", "=>", "⇒", "λ", "𝜆", "\\", "𝕀", "𝕏", "π₁", "π₂", "π", "Λ",  "·", "*", "+", "⊕", "↦", ";", ":", "×", "#", "~", "."],
-  Token.reservedNames  = ["Type", "Session", "State", "Shape", "Dom", "left", "right", "proj1", "proj2", "all", "forall", "ex", "exists", "Chan", "Unit", "Int", "I", "X", "let", "in", "fork", "accept", "request", "send", "on", "receive", "select",  "case", "of", "close", "new", "chan", "unit"],
+  Token.reservedOpNames = ["->", "→", "=>", "⇒", 
+                           "λ", "𝜆", "\\", "𝕀", 
+                           "𝕏", "π₁", "π₂", "π", 
+                           "Λ",  "·", "*", "+", 
+                           "⊕", "↦", ";", ":", 
+                           "×", "#", "~", "."],
+  Token.reservedNames  = ["Type", "Session", "State", "Shape",
+                          "Dom", "left", "right", "proj1",
+                          "proj2", "all", "forall", 
+                          "ex", "exists", "Chan", "Unit",
+                          "Int", "I", "X", "let", "in", 
+                          "fork", "accept", "request", "send", 
+                          "on", "receive", "select",  "case",
+                          "of", "close", "new", "chan", "unit"],
   Token.caseSensitive = True
 }
 
@@ -427,7 +440,8 @@ expr2 = expr3 <|> (do
         Just t -> return $ AApp v t
     [v1, v2] -> return $ App v1 v2
     _ -> unexpected "nested applications not allowed in A-normal form")
-expr3 = fork <|> acc <|> req <|> send <|> recv <|> sel <|> case1 <|> close <|> new <|> proj <|> parens expr1
+expr3 = fork <|> acc <|> req <|> send <|> recv <|> sel 
+        <|> case1 <|> close <|> new <|> proj <|> parens expr1
 
 val1 = vAbs <|> vTAbs <|> val2
 val2 = vChan <|> vUnit <|> vPair <|> parens val1 <|> vInt <|> vVar

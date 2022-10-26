@@ -24,8 +24,9 @@ type Equiv = (String, String)
 
 kEq ctx k1 k2 = case kEq' ctx k1 k2 of
   Right x -> Right x
-  Left err -> Left $ err ++ "\n\n-----------::      equality of       ::-----------\n----  left  ----\n" ++ pretty k1 ++ "\n---- right ----\n" ++ pretty k2 ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
-
+  Left err -> Left $ err ++ "\n\n-----------::      equality of       ::-----------\n----  left  ----\n" 
+                          ++ pretty k1 ++ "\n---- right ----\n" ++ pretty k2 ++ "\n----  ctx  ----\n[" 
+                          ++ pretty ctx ++ "]"
 
 kEq' :: Ctx -> Kind -> Kind -> Result ()
 kEq' ctx KType KType = ok ()
@@ -39,7 +40,9 @@ kEq' ctx (KArr d1 c1) (KArr d2 c2) = do
 kEq' ctx k1 k2 = raise ("[K-Eq] kind mismatch between " ++ pretty k1 ++ " and " ++ pretty k2)
 
 kEqs :: Ctx -> Kind -> [Kind] -> Result ()
-kEqs ctx k ks = if all (isLeft . kEq ctx k) ks then raise ("[K-Eq] kind " ++ pretty k ++ " needs to be one of " ++ pretty ks) else ok ()
+kEqs ctx k ks = if all (isLeft . kEq ctx k) ks 
+  then raise ("[K-Eq] kind " ++ pretty k ++ " needs to be one of " ++ pretty ks) 
+  else ok ()
 
 kNEq :: Ctx -> Kind -> Kind -> Result ()
 kNEq ctx k1 k2 = do
@@ -49,7 +52,9 @@ kNEq ctx k1 k2 = do
 
 tEq ctx t1 t2 = case tEq'' ctx t1 t2 of
   Right x -> Right x       
-  Left err -> Left $ err ++ "\n\n-----------::      equality of       ::-----------\n----  left  ----\n" ++ pretty t1 ++ "\n---- right ----\n" ++ pretty t2 ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
+  Left err -> Left $ err ++ "\n\n-----------::      equality of       ::-----------\n----  left  ----\n" 
+                         ++ pretty t1 ++ "\n---- right ----\n" ++ pretty t2 ++ "\n----  ctx  ----\n[" 
+                         ++ pretty ctx ++ "]"
  
 tEq'' :: Ctx -> Type -> Type -> Result ()
 tEq'' ctx = tEq' ctx []
@@ -168,7 +173,9 @@ ctxUnify' eqs uqs ctx ctx1 ctx2 = do
 {- unification for ∃Γ.Σ;T -}
 existEq ctx tri1 tri2 = case existEq'' ctx tri1 tri2 of
   Right x -> Right x
-  Left err -> Left $ err  ++ "\n\n-----------::      equality of       ::-----------\n----  left  ----\n" ++ pretty tri2 ++ "\n---- right ----\n" ++ pretty tri2 ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
+  Left err -> Left $ err ++ "\n\n-----------::      equality of       ::-----------\n----  left  ----\n" 
+                         ++ pretty tri2 ++ "\n---- right ----\n" ++ pretty tri2 ++ "\n----  ctx  ----\n[" 
+                         ++ pretty ctx ++ "]"
 
 existEq'' :: Ctx -> (Ctx, Type, Type) -> (Ctx, Type, Type) -> Result ()
 existEq'' ctx = existEq' ctx []

@@ -156,7 +156,8 @@ subT x s (EAll x2 k cs t) = if x == x2 then EAll x2 (subK x s k) cs t else
       Nothing -> EAll x2 (subK x s k) (subCstrs x s cs) (subT x s t)
       Just _ -> let v = freshVar x2 in
         EAll v (subK x s k) (subCstrs x s (renCstrs x2 v cs)) (subT x s (renT x2 v t))
-subT x s (EArr st1 t1 ctx st2 t2) = EArr (subT x s st1) (subT x s t1) (subCtx x s ctx) (subT x s st2) (subT x s t2) 
+subT x s (EArr st1 t1 ctx st2 t2) = EArr (subT x s st1) (subT x s t1) 
+                                    (subCtx x s ctx) (subT x s st2) (subT x s t2) 
 subT x s (EChan d) = EChan (subT x s d)
 subT x s (EAcc t) = EAcc (subT x s t)
 subT x s EUnit = EUnit 

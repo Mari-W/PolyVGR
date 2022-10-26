@@ -59,7 +59,7 @@ isDomCtx :: Ctx -> Result ()
 isDomCtx [] = ok ()
 isDomCtx (x : xs) = case x of
   (_, HasKind (KDom _)) -> isDomCtx xs
-  _ -> raise ("[CTX] found non domain " ++ pretty x ++ " in ctx")
+  _ -> raise ("[K-Arr] expected only domains in context, got: " ++ pretty x)
 
 gd :: Ctx -> Ctx
 gd [] = []

@@ -25,7 +25,8 @@ import Debug.Trace
 
 typeV' ctx v = case typeV ctx v of
   Right x -> Right x
-  Left err -> Left $ err ++ err  ++ "\n\n-----------::        type of         ::-----------\n---- value ----\n" ++ pretty v ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
+  Left err -> Left $ err ++ "\n\n-----------::        type of         ::-----------\n---- value ----\n" 
+                         ++ pretty v ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
 
 typeV :: Ctx -> Val -> Result Type
 {- T-Var -}
@@ -65,7 +66,8 @@ typeV ctx (VAbs st s t e) = do
 
 typeE' ctx st e = case typeE ctx st e of
   Right x -> Right x
-  Left err -> Left $ err  ++ "\n\n-----------::        type of         ::-----------\n----  expr  ----\n" ++ pretty e ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n{" ++ pretty st ++ "}"
+  Left err -> Left $ err  ++ "\n\n-----------::        type of         ::-----------\n----  expr  ----\n" 
+                          ++ pretty e ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n" ++ pretty st 
 
 typeE :: Ctx -> Type -> Expr -> Result (Ctx, Type, Type)
 {- T-Let -}
@@ -145,7 +147,8 @@ typeE ctx st (Send v1 v2) = do
               st' <- stSplitSt ctx r st1'
               ok ([], SSMerge st' (SSBind d1 s), EUnit)
             _ -> raise ("[T-Send] can only abstract over domains, got " ++ pretty kd2)
-        _ -> raise ("[T-Send] expected send channel (i.e !s) along a state including its binding, got " ++ pretty tv1 ++ " and " ++ pretty st)
+        _ -> raise ("[T-Send] expected send channel (i.e !s) along a state including its binding, got "
+                    ++ pretty tv1 ++ " and " ++ pretty st)
     _ -> raise ("[T-Send] expected channel to send on got " ++ pretty tv2)
 {- T-Receive -}
 typeE ctx st (Recv v) = do 
@@ -157,7 +160,8 @@ typeE ctx st (Recv v) = do
           kd1 <- kind' ctx d1
           kEq ctx kd1 (KDom SHSingle)
           ok ([(x, HasKind kd2)], SSMerge r (SSMerge st1 (SSBind d1 s)), t1)
-        _ -> raise ("[T-Recv] expected receive channel (i.e ?s) along a state including its binding, got " ++ pretty tv ++ " and " ++ pretty st)
+        _ -> raise ("[T-Recv] expected receive channel (i.e ?s) along a state including its binding, got " 
+                    ++ pretty tv ++ " and " ++ pretty st)
     _ -> raise ("[T-Send] expected channel to receive on, got " ++ pretty tv)
 {- T-Fork -}
 typeE ctx st (Fork v) = do 
@@ -175,7 +179,8 @@ typeE ctx st (Close v) = do
     EChan d1 -> case stSplitDom ctx st d1 of 
         Just (r , SEnd) -> do
           ok ([], r, EUnit)
-        _ -> raise ("[T-Close] expected closable channel (i.e End) along its state binding, got " ++ pretty tv ++ " and " ++ pretty st)
+        _ -> raise ("[T-Close] expected closable channel (i.e End) along its state binding, got " 
+                    ++ pretty tv ++ " and " ++ pretty st)
     _ -> raise ("[T-Close] expected channel to close, got " ++ pretty tv)
 {- T-Select -}
 typeE ctx st (Sel l v) = do 
@@ -185,7 +190,8 @@ typeE ctx st (Sel l v) = do
         Just (r , SChoice cl cr) -> case l of 
             LLeft -> ok ([], SSMerge r (SSBind d1 cl), EUnit)
             LRight -> ok ([], SSMerge r (SSBind d1 cr), EUnit)
-        _ -> raise ("[T-Select] expected selectable channel (i.e s + s') along its state binding, got " ++ pretty tv ++ " and " ++ pretty st)
+        _ -> raise ("[T-Select] expected selectable channel (i.e s + s') along its state binding, got " 
+                    ++ pretty tv ++ " and " ++ pretty st)
     _ -> raise ("[T-Select] expected channel to select from, got " ++ pretty tv)
 {- T-Case -}
 typeE ctx st (Case v e1 e2) = do 
@@ -197,7 +203,8 @@ typeE ctx st (Case v e1 e2) = do
           tri2 @ (ctxr, str, tr) <- typeE' ctx (SSMerge r (SSBind d1 s2)) e2
           existEq ctx tri1 tri2 
           ok (ctxl, stl, tl)
-        _ -> raise ("[T-Select] expected branched channel (i.e s & s') along a state including its binding, got " ++ pretty tv ++ " and " ++ pretty st)
+        _ -> raise ("[T-Select] expected branched channel (i.e s & s') along a state including its binding, got " 
+                    ++ pretty tv ++ " and " ++ pretty st)
     _ -> raise ("[T-Select] expected channel to case split on got " ++ pretty tv)
 
 typeP :: Program -> Result ()
@@ -209,7 +216,8 @@ typeP (abs, cbs, es) = do
 
 typeCA' ctx abs = case typeCA ctx abs of
   Right x -> Right x
-  Left err -> Left $ err  ++ "\n\n-----------::        type of         ::-----------\n---- binds ----\n" ++ pretty abs ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
+  Left err -> Left $ err ++ "\n\n-----------::        type of         ::-----------\n---- binds ----\n" 
+                         ++ pretty abs ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
 
 typeCA :: Ctx -> [AccBind] -> Result Ctx
 typeCA ctx [] = ok ctx
@@ -223,7 +231,8 @@ typeCA ctx ((s, t) : xs) = case t of
 
 typeCC' ctx st cbs = case typeCC ctx st cbs of
   Right x -> Right x
-  Left err -> Left $err  ++ "\n\n-----------::        type of         ::-----------\n---- binds ----\n" ++ pretty cbs ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n{" ++ pretty st ++ "}"
+  Left err -> Left $ err ++ "\n\n-----------::        type of         ::-----------\n---- binds ----\n" 
+                         ++ pretty cbs ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n" ++ pretty st 
 
 typeCC :: Ctx -> Type -> [ChanBind] -> Result (Ctx, Type) 
 typeCC ctx st [] = ok (ctx, st)
@@ -235,7 +244,8 @@ typeCC ctx st (((s, s'), t) : xs) = do
 
 typeCE' ctx st es = case typeCE ctx st es of
   Right x -> Right x
-  Left err -> Left $ err  ++ "\n\n-----------::        type of         ::-----------\n---- exprs ----\n" ++ pretty es ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n{" ++ pretty st ++ "}"
+  Left err -> Left $ err ++ "\n\n-----------::        type of         ::-----------\n---- exprs ----\n" 
+                         ++ pretty es ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n" ++ pretty st
 
 typeCE :: Ctx -> Type -> [Expr] -> Result Type
 typeCE ctx st [] = ok st

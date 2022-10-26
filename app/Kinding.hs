@@ -44,11 +44,13 @@ cwf' ((x, h) : xs) = case h of
     kr <- kind' xs r
     case (kl, kr) of 
       (KDom _, KDom _) -> cwf' xs
-      _ -> raise ("[CF-ConsCstr] expected domains as constraints, got " ++ pretty kl ++ " and " ++ pretty kr)   
+      _ -> raise ("[CF-ConsCstr] expected domains as constraints, got " 
+                  ++ pretty kl ++ " and " ++ pretty kr)   
 
 kind' ctx t = case kind ctx t of
   Right x -> Right x    
-  Left err -> Left $ err  ++ "\n\n-----------::        kind of         ::-----------\n----  type  ----\n" ++ pretty t ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
+  Left err -> Left $ err ++ "\n\n-----------::        kind of         ::-----------\n----  type  ----\n" 
+                         ++ pretty t ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
 
 
 kind :: Ctx -> Type -> Result Kind

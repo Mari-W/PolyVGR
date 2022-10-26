@@ -51,7 +51,8 @@ filterCstrs (x : xs) = case x of
   _ -> filterCstrs xs
 
 searchCstr :: [Cstr] -> Cstr -> Result ()
-searchCstr [] (a, b) = raise $ "[CE] constraint not satisfied: " ++ show a ++ " # " ++ show b
+searchCstr [] (a, b) = raise $ "[CE] constraint not satisfied, could not solve for " 
+                               ++ show a ++ " # " ++ show b
 searchCstr ((x, y) : xs) (a, b) = if x == a && y == b 
   then ok ()
   else searchCstr xs (a, b)
