@@ -14,9 +14,9 @@ let thread2 = λ({}; _ : Unit).
 let thread3 = λ({}; _ : Unit). 
   let channel = accept access_point in
   let recv_channel = receive channel in
-  let _ = send 42 on received_channel in
+  let _ = send 42 on recv_channel in
   let _ = close channel in
-  let _ = close receive_channel in
+  let _ = close recv_channel in
   unit in
 let _ = fork thread1 in
 let _ = fork thread2 in

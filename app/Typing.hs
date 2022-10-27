@@ -150,7 +150,7 @@ typeE ctx st (Send v1 v2) = do
             KDom sh -> do
               ksh <- kind' ctx sh
               kEq ctx ksh KShape
-              u <- tUnify ctx [] tv1 t1
+              u <- tUnify ctx [] t1 tv1
               st1' <- renTM u st1
               st' <- stSplitSt ctx r st1'
               ok ([], SSMerge st' (SSBind d1 s), EUnit)

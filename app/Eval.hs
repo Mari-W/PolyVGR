@@ -8,7 +8,7 @@ import Ast
       ExprCtx(..),
       Label(LRight, LLeft),
       Program,
-      Type(TVar, EAcc, SSend, SChoice, SEnd),
+      Type(TVar, EAcc, SSend, SChoice, SEnd, SRecv, SBranch),
       Val(..) )
 import Substitution ( subE, subTV )
 import Data.Foldable ()
@@ -51,7 +51,7 @@ findEC :: [Expr] -> (Expr -> Bool) -> Maybe ([Expr], ExprCtx, Expr, [Expr])
 findEC [] f = Nothing
 findEC (e : es) f = let (ce', e') = splitExpr e in
   if f e' then Just ([], ce', e', es) 
-  else fmap (\(es1, ce'', e'', es2) -> (es1 ++ [e], ce'', e'', es2)) (findEC es f)
+  else fmap (\(es1, ce'', e'', es2) -> (e : es1, ce'', e'', es2)) (findEC es f)
 
 findEC2 :: [Expr] -> (Expr -> Bool) -> (Expr -> Bool) -> Maybe ([Expr], ExprCtx, Expr, [Expr], ExprCtx, Expr, [Expr])
 findEC2 es f1 f2 = case findEC es f1 of
@@ -110,48 +110,61 @@ tryEvalReqAcc (a @ (x, EAcc s) : xs) p @ (abs, cbs, es) = case findEC2 es (isReq
   Just (les, lce, l, mes, rce, r, res) -> 
     let f reqAcc = do
          (v, v') <- freshVar2 "c"
-         let (l, r) = if reqAcc then (VChan (TVar v), VChan (TVar v')) else  (VChan (TVar v'), VChan (TVar v))
+         let (l, r) = if reqAcc then (VChan (TVar v), VChan (TVar v')) else (VChan (TVar v'), VChan (TVar v))
          return (abs, cbs ++ [((v, v'), s)], les ++ [mergeExpr lce (Val l)] ++ mes ++ [mergeExpr rce (Val r)] ++ res)
     in case (l, r) of  
       (Req {}, Acc {}) -> Just $ f True
       (Acc {}, Req {}) -> Just $ f False
-      _ -> Nothing
+      _ -> undefined
   _ -> tryEvalReqAcc xs p
-tryEvalReqAcc _ _ = Nothing
+tryEvalReqAcc [] _ = Nothing
+tryEvalReqAcc (x : xs) p = tryEvalReqAcc xs p
+
 
 tryEvalSendRecv :: [ChanBind] -> Program -> Maybe Program
-tryEvalSendRecv (cb @ ((x, x'), SSend sa k st t c) : xs) p @ (abs, cbs, es) = case findEC2 es (isSend x) (isRecv x') of  
-  Just (les, lce, l, mes, rce, r, res) ->
-    (case (l, r) of  
-      (Send sv _, Recv {}) -> Just (VUnit, sv)
-      (Recv {}, Send sv _) -> Just (sv, VUnit)
-      _ -> Nothing
-    ) <&> (\(l, r) -> (abs, replace cbs cb ((x, x'), c) , les ++ [mergeExpr lce (Val l)] ++ mes ++ [mergeExpr rce (Val r)] ++ res))
-  _ -> tryEvalSendRecv xs p
-tryEvalSendRecv _ _ = Nothing
+tryEvalSendRecv (cb @ ((x, x'), ss) : xs) p @ (abs, cbs, es) =
+  let f c = case findEC2 es (isSend x) (isRecv x') of  
+              Just (les, lce, l, mes, rce, r, res) ->
+                (case (l, r) of  
+                  (Send sv _, Recv {}) -> Just (VUnit, sv)
+                  (Recv {}, Send sv _) -> Just (sv, VUnit)
+                  _ -> undefined 
+                ) <&> (\(l, r) -> (abs, replace cbs cb ((x, x'), c) , les ++ [mergeExpr lce (Val l)] ++ mes ++ [mergeExpr rce (Val r)] ++ res))
+              _ -> tryEvalSendRecv xs p
+  in case ss of
+    SSend _ _ _ _ c -> f c
+    SRecv _ _ _ _ c -> f c
+    _ ->  tryEvalSendRecv xs p
+tryEvalSendRecv [] _ = Nothing
 
 tryEvalSelCase :: [ChanBind] -> Program -> Maybe Program
-tryEvalSelCase (cb @ ((x, x'), SChoice sl sr) : xs) p @ (abs, cbs, es) = case findEC2 es (isSel x) (isCase x') of  
-  Just (les, lce, l, mes, rce, r, res) ->
-    (case (l, r) of  
-      (Sel l _, Case _ e1 e2) -> 
-        Just (Val VUnit, case l of {LLeft -> e1; LRight -> e2}, case l of {LLeft -> sl; LRight -> sr})
-      (Case _ e1 e2, Sel l _) -> 
-        Just (case l of {LLeft -> e1; LRight -> e2}, Val VUnit, case l of {LLeft -> sl; LRight -> sr})
-      _ -> Nothing
-    ) <&> (\(l, r, t) -> (abs, replace cbs cb ((x, x'), t) , les ++ [mergeExpr lce l] ++ mes ++ [mergeExpr rce r] ++ res))
-  _ -> tryEvalSelCase xs p
-tryEvalSelCase _ _ = Nothing
+tryEvalSelCase (cb @ ((x, x'), ss) : xs) p @ (abs, cbs, es) = 
+  let f sl sr = case findEC2 es (isSel x) (isCase x') <|> findEC2 es (isSel x') (isCase x) of  
+                  Just (les, lce, l, mes, rce, r, res) ->
+                    (case (l, r) of  
+                      (Sel l _, Case _ e1 e2) -> 
+                        Just (Val VUnit, case l of {LLeft -> e1; LRight -> e2}, case l of {LLeft -> sl; LRight -> sr})
+                      (Case _ e1 e2, Sel l _) -> 
+                        Just (case l of {LLeft -> e1; LRight -> e2}, Val VUnit, case l of {LLeft -> sl; LRight -> sr})
+                      _ -> undefined
+                    ) <&> (\(l, r, t) -> (abs, replace cbs cb ((x, x'), t) , les ++ [mergeExpr lce l] ++ mes ++ [mergeExpr rce r] ++ res))
+                  _ -> tryEvalSelCase xs p
+   in case ss of
+    SChoice sl sr -> f sl sr
+    SBranch sl sr -> f sl sr
+    _ ->  tryEvalSendRecv xs p
+tryEvalSelCase [] _ = Nothing
 
 tryEvalClose :: [ChanBind] -> Program -> Maybe Program
 tryEvalClose (cb @ ((x, x'), SEnd) : xs) p @ (abs, cbs, es) = case findEC2 es (isClose x) (isClose x') of  
   Just (les, lce, l, mes, rce, r, res) ->
     (case (l, r) of  
       (Close {}, Close {}) -> Just (VUnit, VUnit)
-      _ -> Nothing
+      _ -> undefined
     ) <&> (\(l, r) -> (abs, remove cbs cb, les ++ [mergeExpr lce (Val l)] ++ mes ++ [mergeExpr rce (Val r)] ++ res))
   _ -> tryEvalClose xs p
-tryEvalClose _ _ = Nothing
+tryEvalClose [] _ = Nothing
+tryEvalClose (_ : xs) p = tryEvalClose xs p
 
 split :: Eq a => a -> [a] -> ([a], [a])
 split x = fmap (drop 1) . break (x ==)
