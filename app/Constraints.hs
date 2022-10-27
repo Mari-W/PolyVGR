@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Constraints where
 
 import Ast
@@ -11,21 +12,23 @@ import Context ( combs )
 import Conversion ( tNf )
 import Data.List ( find )
 import Pretty ( Pretty(pretty) ) 
+import Control.Monad.Except (MonadError)
+import Control.Monad.State (MonadState)
 
-splitDom :: Type -> Result [Type]
+splitDom :: (MonadState Int m, MonadError String m) => Type -> m [Type]
 splitDom DEmpty = ok []
 splitDom (DMerge d d') = (++) <$> splitDom d <*> splitDom d'
 splitDom (DProj l d) = ok [DProj l d]
 splitDom (TVar x) = ok [TVar x]
 splitDom t = raise ("[CE] expected state to extract dom of, got " ++ pretty t)
 
-splitCstr :: Cstr -> Result [Cstr]
+splitCstr :: (MonadState Int m, MonadError String m) => Cstr -> m [Cstr]
 splitCstr (a, b) = do
-  xs <- splitDom (tNf a)
-  ys <- splitDom (tNf b)
-  ok (combs xs ys ++ combs ys xs)
+  xs <- splitDom =<< tNf a
+  ys <- splitDom =<< tNf b
+  return (combs xs ys ++ combs ys xs)
 
-splitCstrs :: [Cstr] -> Result [Cstr]
+splitCstrs :: (MonadState Int m, MonadError String m) =>  [Cstr] -> m [Cstr]
 splitCstrs x = fmap concat (mapM splitCstr x)
 
 invLabel :: Label -> Label 
@@ -50,20 +53,20 @@ filterCstrs (x : xs) = case x of
   (_, HasCstr c) -> c : filterCstrs xs
   _ -> filterCstrs xs
 
-searchCstr :: [Cstr] -> Cstr -> Result ()
+searchCstr :: MonadError String m => [Cstr] -> Cstr -> m ()
 searchCstr [] (a, b) = raise $ "[CE] constraint not satisfied, could not solve for " 
                                ++ show a ++ " # " ++ show b
 searchCstr ((x, y) : xs) (a, b) = if x == a && y == b 
   then ok ()
   else searchCstr xs (a, b)
 
-searchCstrs :: [Cstr] -> [Cstr] -> Result ()
+searchCstrs :: MonadError String m => [Cstr] -> [Cstr] -> m ()
 searchCstrs atms (x : xs) = do
   searchCstr atms x
   searchCstrs atms xs
 searchCstrs atms [] = ok ()
 
-ce :: Ctx -> [Cstr] -> Result ()
+ce :: (MonadState Int m, MonadError String m) => Ctx -> [Cstr] -> m ()
 ce ctx cs = do
   assm <- fixExtCstrs <$> splitCstrs (filterCstrs ctx)
   cstrs <- splitCstrs cs

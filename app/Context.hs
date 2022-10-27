@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase,FlexibleContexts #-}
 module Context where
 
 import Ast
@@ -10,6 +10,8 @@ import System.Random ( newStdGen, Random(randomRs) )
 import System.IO.Unsafe ( unsafePerformIO )
 import Pretty ( Pretty(pretty) )
 import Data.IORef
+import Control.Monad.State
+import Control.Monad.Except (MonadError)
 
 kExt :: Ctx -> (String, Kind) -> Ctx
 kExt ctx (s, k) = ctx ++ [(s, HasKind k)]
@@ -24,38 +26,33 @@ cExt ctx c = do
 csExt :: Ctx -> [Cstr] -> Ctx
 csExt = foldl cExt
 
-kRes :: Ctx -> String -> Result Kind
+kRes :: MonadError String m => Ctx -> String -> m Kind
 kRes ctx s = case find (\(s', _) -> s' == s) (filter (\case (str, HasKind _) -> True; _ -> False ) (rev ctx)) of
   Just (_, HasKind k) -> ok k
   _ -> raise $ "[CTX] could not resolve kind of " ++ s
 
-tRes :: Ctx -> String -> Result Type
+tRes :: MonadError String m => Ctx -> String -> m Type
 tRes ctx s = case find (\(s', _) -> s' == s) (filter (\case (str, HasType _) -> True; _ -> False ) (rev ctx)) of
   Just (_, HasType t) -> ok t
   _ -> raise $ "[CTX] could not resolve type of " ++ s
 
-{-# NOINLINE globalVar #-}
-globalVar :: IORef Integer
-globalVar = unsafePerformIO (newIORef 0)
 
-{-# INLINE freshVar #-}
-freshVar :: String -> String
-freshVar n = unsafePerformIO $ do
-  s <- readIORef globalVar
-  writeIORef globalVar (s + 1)
-  return $ "_" ++ n ++ show s
+freshVar :: MonadState Int m => String -> m String
+freshVar n = do
+  s <- get
+  put (s + 1)
+  return $ "'" ++ n ++ show s
 
-{-# INLINE freshVar2 #-}
-freshVar2 :: String -> (String, String)
-freshVar2 n = unsafePerformIO $ do
-  s <- readIORef globalVar
-  writeIORef globalVar (s + 1)
-  return ("_" ++ n ++ show s, "_~" ++ n ++ show s)
+freshVar2 :: MonadState Int m => String -> m (String, String)
+freshVar2 n = do
+  s <- get
+  put (s + 1)
+  return ("'" ++ n ++ show s, "'~" ++ n ++ show s)
 
 rev :: Ctx -> Ctx
 rev = foldl (flip (:)) []
 
-isDomCtx :: Ctx -> Result ()
+isDomCtx :: MonadError String m => Ctx -> m ()
 isDomCtx [] = ok ()
 isDomCtx (x : xs) = case x of
   (_, HasKind (KDom _)) -> isDomCtx xs

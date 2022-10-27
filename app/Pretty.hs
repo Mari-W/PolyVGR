@@ -102,7 +102,7 @@ instance Pretty Type where
   pp i p (DProj la ty) = indent i $ brace p 100 ("π" ++ pp 0 0 la ++ " " ++ pp 0 101 ty)
   pp i p SSEmpty = "·"
   pp i p (SSBind ty ty') = indent i $ brace p 4 (pp 0 5 ty ++ " ↦ " ++ pp 0 5 ty')
-  pp i p (SSMerge SSEmpty SSEmpty ) = indent i $ brace p 3 "{}"
+  pp i p (SSMerge SSEmpty SSEmpty) = indent i $ brace p 3 "·"
   pp i p (SSMerge SSEmpty ty') = indent i $ brace p 3 (pp 0 3 ty')
   pp i p (SSMerge ty SSEmpty) = indent i $ brace p 3 (pp 0 3 ty)
   pp i p (SSMerge ty ty') = indent i $ brace p 3 (pp 0 3 ty ++ " , " ++ pp 0 3 ty')

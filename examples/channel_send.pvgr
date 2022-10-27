@@ -1,0 +1,24 @@
+let access_point = new !(∃α : Dom (X). {α -> !(∃α : Dom (I). {}; Int).End}; Chan α).End in
+let another_access_point = new !(∃α : Dom (I). {}; Int).End in
+let thread1 = λ({}; _ : Unit). 
+  let channel = request access_point in
+  let another_channel = request another_access_point in
+  let _ = send another_channel on channel in
+  let _ = close channel in
+  unit in
+let thread2 = λ({}; _ : Unit). 
+  let another_channel = accept another_access_point in
+  let _ = receive another_channel in
+  let _ = close another_channel in
+  unit in
+let thread3 = λ({}; _ : Unit). 
+  let channel = accept access_point in
+  let recv_channel = receive channel in
+  let _ = send 42 on received_channel in
+  let _ = close channel in
+  let _ = close receive_channel in
+  unit in
+let _ = fork thread1 in
+let _ = fork thread2 in
+let _ = fork thread3 in
+unit 

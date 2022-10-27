@@ -13,15 +13,16 @@ import Ast
 import Result (Result, ok, raise, ResultT)
 import Text.ParserCombinators.Parsec
     ( alphaNum, letter, parse, many, many1, optional, space, noneOf,
-      option, sepBy1, unexpected, eof, (<|>), sepBy, oneOf, try, lookAhead )
+      option, sepBy1, unexpected, eof, (<|>), sepBy, oneOf, try, lookAhead, char )
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import Data.List (isInfixOf)
 import Text.Parsec.Language (emptyDef)
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class (liftIO, MonadIO)
 import Text.Parsec.Combinator (optionMaybe)
+import Control.Monad.Except (MonadError)
 
 
-parseFile :: String -> ResultT IO Expr
+parseFile :: (MonadError String m, MonadIO m) => String -> m Expr
 parseFile file = do
   prog <- liftIO $ readFile file
   case parse (whiteSpace *> expr1 <* whiteSpace <* eof) "" prog of
@@ -40,8 +41,8 @@ langDef = emptyDef {
   Token.commentStart = "/*",
   Token.commentEnd = "*/",
   Token.commentLine = "//",
-  Token.identStart = letter,
-  Token.identLetter = alphaNum,
+  Token.identStart = letter <|> char '_',
+  Token.identLetter = alphaNum <|> char '_',
   Token.reservedOpNames = ["->", "→", "=>", "⇒", 
                            "λ", "𝜆", "\\", "𝕀", 
                            "𝕏", "π₁", "π₂", "π", 

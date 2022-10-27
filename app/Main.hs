@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Main where
 
 import Ast ( Type(SSEmpty) )
@@ -8,18 +9,19 @@ import Parser (parseFile)
 import System.Environment ( getArgs )
 import Context (freshVar)
 import Result (ResultT, raise)
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Monad.Error.Class (liftEither)
-import Control.Monad.Except (runExceptT)
+import Control.Monad.State (MonadState, StateT (runStateT))
+import Control.Monad.Except (MonadError, runExceptT)
 
-run :: ResultT IO ()
+run :: (MonadState Int m, MonadIO m, MonadError String m) => m ()
 run = do
   args <- liftIO getArgs
   arg1 <- case args of
     [a] -> return a
     _ -> raise "expected path to file as the only argument"
   p <- parseFile arg1
-  t <- liftEither $ typeE' [] SSEmpty p
+  t <- typeE' [] SSEmpty p
   liftIO $ putStrLn ("-----------::          expr           ::-----------\n\n" ++ pretty p ++
                      "\n\n-----------::        has type         ::-----------\n\n" ++ pretty t ++
                      "\n\n-----------::      communication      ::-----------\n")
@@ -28,7 +30,7 @@ run = do
 
 main :: IO ()
 main = do
-  res <- runExceptT run
+  res <- runExceptT (runStateT run 0)
   case res of    
     Left s -> putStrLn s
-    Right x0 -> return ()
+    Right _ -> return ()

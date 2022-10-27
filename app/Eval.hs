@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, FlexibleContexts #-}
 module Eval where
   
 import Ast
@@ -21,13 +21,14 @@ import Data.Data ()
 import Context (freshVar, freshVar2)
 import Debug.Trace
 import Pretty
-import Control.Monad.Error.Class (liftEither)
+import Control.Monad.Error.Class (liftEither, MonadError)
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.State
 
-evalV :: Val -> ResultT IO Program
+evalV :: (MonadState Int m, MonadIO m, MonadError String m) => Val -> m Program
 evalV v = evalE (Val v)
 
-evalE :: Expr -> ResultT IO Program
+evalE :: (MonadState Int m, MonadIO m, MonadError String m) => Expr -> m Program
 evalE e = evalP ([], [], [e])
 
 splitExpr :: Expr -> (ExprCtx, Expr)
@@ -40,9 +41,11 @@ mergeExpr :: ExprCtx -> Expr -> Expr
 mergeExpr ECHole e = e
 mergeExpr (ECLet x ec b) e = Let x (mergeExpr ec e) b
 
-mapExprCtx :: (Expr ->  Expr) -> Expr -> Expr
-mapExprCtx f e = let (ce', e') = splitExpr e in
-  mergeExpr ce' (f e')
+mapMExprCtx :: (Monad m) => (Expr ->  m Expr) -> Expr -> m Expr
+mapMExprCtx f e = do
+  let (ce', e') = splitExpr e
+  fe' <- f e'
+  return $ mergeExpr ce' fe'
 
 findEC :: [Expr] -> (Expr -> Bool) -> Maybe ([Expr], ExprCtx, Expr, [Expr])
 findEC [] f = Nothing
@@ -58,56 +61,61 @@ findEC2 es f1 f2 = case findEC es f1 of
         _ -> Nothing
      Nothing -> Nothing
 
-evalE' :: Expr -> Expr
+evalE' :: (MonadState Int m) => Expr -> m Expr
 evalE' (App (VAbs _ x _ e) v) = subE x v e
-evalE' (AApp (VTAbs x _ _ v) t) = Val (subTV x t v)
+evalE' (AApp (VTAbs x _ _ v) t) = Val <$> subTV x t v
 evalE' (Let x (Val v) e) = subE x v e
-evalE' (Let x e1 e2) = Let x (evalE' e1) e2
+evalE' (Let x e1 e2) = Let x <$> evalE' e1 <*> pure e2
 evalE' (Proj l (VPair v1 v2)) = case l of   
-  LLeft -> Val v1
-  LRight -> Val v2
-evalE' e = e
+  LLeft -> return $ Val v1
+  LRight -> return $ Val v2
+evalE' e = return e
 
-fixEvalEs :: [Expr] -> [Expr]
-fixEvalEs es = let es' = map (mapExprCtx evalE') es in
-  if es == es' then es' else fixEvalEs es'
+fixEvalEs :: (MonadState Int m) => [Expr] -> m [Expr]
+fixEvalEs es = do
+  es' <- mapM (mapMExprCtx evalE') es
+  if es == es' then return es' else fixEvalEs es'
 
-evalP :: Program -> ResultT IO Program
+evalP :: (MonadState Int m, MonadIO m, MonadError String m) => Program -> m Program
 evalP p @ (abs, cbs, es) = do
-  let es' = fixEvalEs es 
+  es' <- fixEvalEs es 
   let p = (abs, cbs, es') 
   liftIO $ putStrLn $ pretty p ++ "\n---------------------------------------------------\n"
   case tryEvalC p of
-    Nothing -> ok p
-    Just p' -> do 
-      liftEither $ typeP p'
+    Nothing -> return p
+    Just mp' -> do 
+      p' <- mp'
+      typeP p'
       evalP p'
 
-tryEvalC :: Program -> Maybe Program
-tryEvalC p @ (abs, cbs, _) = tryEvalFork p <|> 
+tryEvalC :: MonadState Int m => Program -> Maybe (m Program)
+tryEvalC p @ (abs, cbs, _) = return <$> tryEvalFork p <|> 
                              tryEvalNew p <|> 
                              tryEvalReqAcc abs p <|> 
-                             tryEvalSendRecv cbs p <|> 
-                             tryEvalSelCase cbs p <|> 
-                             tryEvalClose cbs p
+                             return <$> tryEvalSendRecv cbs p <|> 
+                             return <$> tryEvalSelCase cbs p <|> 
+                             return <$> tryEvalClose cbs p
 
 tryEvalFork :: Program -> Maybe Program
 tryEvalFork p @ (abs, cbs, es) = findEC es isFork <&> \(es1, ce, Fork v, es2) -> 
-  (abs, cbs, es1 ++ [App v VUnit, mergeExpr ce (Val VUnit)] ++ es2)
+   (abs, cbs, es1 ++ [App v VUnit, mergeExpr ce (Val VUnit)] ++ es2)
 
-tryEvalNew :: Program -> Maybe Program
-tryEvalNew p @ (abs, cbs, es) = findEC es isNew <&> \(es1, ce, New t, es2) -> 
-    let v = freshVar "ap" in
-    (abs ++ [(v, EAcc t)], cbs, es1 ++ [mergeExpr ce (Val (VVar v))] ++ es2)
+tryEvalNew :: MonadState Int m => Program -> Maybe (m Program)
+tryEvalNew p @ (abs, cbs, es) = findEC es isNew <&> \(es1, ce, New t, es2) -> do 
+    v <- freshVar "ap"
+    return (abs ++ [(v, EAcc t)], cbs, es1 ++ [mergeExpr ce (Val (VVar v))] ++ es2)
 
-tryEvalReqAcc :: [AccBind] -> Program -> Maybe Program
+tryEvalReqAcc :: MonadState Int m => [AccBind] -> Program -> Maybe (m Program)
 tryEvalReqAcc (a @ (x, EAcc s) : xs) p @ (abs, cbs, es) = case findEC2 es (isReq x) (isAcc x) of  
-  Just (les, lce, l, mes, rce, r, res) -> let (v, v') = freshVar2 "c" in
-    (case (l, r) of  
-      (Req {}, Acc {}) -> Just (VChan (TVar v), VChan (TVar v'))
-      (Acc {}, Req {}) -> Just (VChan (TVar v'), VChan (TVar v))
+  Just (les, lce, l, mes, rce, r, res) -> 
+    let f reqAcc = do
+         (v, v') <- freshVar2 "c"
+         let (l, r) = if reqAcc then (VChan (TVar v), VChan (TVar v')) else  (VChan (TVar v'), VChan (TVar v))
+         return (abs, cbs ++ [((v, v'), s)], les ++ [mergeExpr lce (Val l)] ++ mes ++ [mergeExpr rce (Val r)] ++ res)
+    in case (l, r) of  
+      (Req {}, Acc {}) -> Just $ f True
+      (Acc {}, Req {}) -> Just $ f False
       _ -> Nothing
-    ) <&> (\(l, r) -> (abs, cbs ++ [((v, v'), s)], les ++ [mergeExpr lce (Val l)] ++ mes ++ [mergeExpr rce (Val r)] ++ res))
   _ -> tryEvalReqAcc xs p
 tryEvalReqAcc _ _ = Nothing
 

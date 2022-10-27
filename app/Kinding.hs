@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Kinding where
 
 import Ast
@@ -12,8 +13,10 @@ import Result ( ok, raise, Result )
 import Constraints ()
 import State ( stDisj )
 import Pretty ( Pretty(pretty) )
+import Control.Monad.Except (MonadError, throwError, catchError)
+import Control.Monad.State (MonadState)
 
-kwf :: Ctx -> Kind -> Result ()
+kwf :: (MonadError String m, MonadState Int m) =>  Ctx -> Kind -> m ()
 kwf ctx KType = ok ()
 kwf ctx KSession = ok ()
 kwf ctx KState = ok ()
@@ -26,10 +29,10 @@ kwf ctx (KArr k k') = do
   kwf ctx k'
   ok ()
 
-cwf :: Ctx -> Result ()
+cwf :: (MonadError String m, MonadState Int m) => Ctx -> m ()
 cwf ctx = cwf' (rev ctx)
 
-cwf' :: Ctx -> Result ()
+cwf' :: (MonadError String m, MonadState Int m) => Ctx -> m ()
 cwf' [] = ok ()
 cwf' ((x, h) : xs) = case h of 
   HasType t -> do 
@@ -47,13 +50,12 @@ cwf' ((x, h) : xs) = case h of
       _ -> raise ("[CF-ConsCstr] expected domains as constraints, got " 
                   ++ pretty kl ++ " and " ++ pretty kr)   
 
-kind' ctx t = case kind ctx t of
-  Right x -> Right x    
-  Left err -> Left $ err ++ "\n\n-----------::        kind of         ::-----------\n----  type  ----\n" 
+kind' ctx t = catchError (kind ctx t) $ \err ->
+  throwError $ err ++ "\n\n-----------::        kind of         ::-----------\n---- type  ----\n" 
                          ++ pretty t ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
 
 
-kind :: Ctx -> Type -> Result Kind
+kind :: (MonadError String m, MonadState Int m) => Ctx -> Type -> m Kind
 {- K-Var -}
 kind ctx (TVar s) = kRes ctx s
 {- K-App -}

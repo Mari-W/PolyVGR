@@ -1,3 +1,5 @@
+{-# LANGUAGE  FlexibleContexts,ConstraintKinds #-}
+{-# LANGUAGE LambdaCase #-}
 module Typing where
 
 import Ast
@@ -22,13 +24,16 @@ import State ( stSplitDom, stSplitSt )
 import Substitution ( renTM, subCstrs, subT )
 import Pretty ( Pretty(pretty) )
 import Debug.Trace
+import Control.Monad.State (MonadState)
+import Control.Monad.Except (MonadError, catchError, liftEither)
 
-typeV' ctx v = case typeV ctx v of
-  Right x -> Right x
-  Left err -> Left $ err ++ "\n\n-----------::        type of         ::-----------\n---- value ----\n" 
-                         ++ pretty v ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
 
-typeV :: Ctx -> Val -> Result Type
+typeV' :: (MonadError String m, MonadState Int m) => Ctx  -> Val -> m Type
+typeV' ctx v = catchError (typeV ctx v) $ \err -> 
+  raise $ err ++ "\n\n-----------::        type of         ::-----------\n----  val  ----\n" 
+              ++ pretty v ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
+
+typeV :: (MonadError String m, MonadState Int m) => Ctx -> Val -> m Type
 {- T-Var -}
 typeV ctx (VVar x) = tRes ctx x
 {- T-Unit -}
@@ -64,12 +69,12 @@ typeV ctx (VAbs st s t e) = do
   kEq ctx ke KType 
   ok (EArr st t ctx' st' te)
 
-typeE' ctx st e = case typeE ctx st e of
-  Right x -> Right x
-  Left err -> Left $ err  ++ "\n\n-----------::        type of         ::-----------\n----  expr  ----\n" 
-                          ++ pretty e ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n" ++ pretty st 
+typeE' :: (MonadError String m, MonadState Int m) => Ctx -> Type -> Expr -> m (Ctx, Type, Type)
+typeE' ctx st e = catchError (typeE ctx st e) $ \err -> 
+  raise $ err ++ "\n\n-----------::        type of         ::-----------\n---- expr  ----\n" 
+              ++ pretty e ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n" ++ pretty st
 
-typeE :: Ctx -> Type -> Expr -> Result (Ctx, Type, Type)
+typeE :: (MonadError String m, MonadState Int m) => Ctx -> Type -> Expr -> m (Ctx, Type, Type)
 {- T-Let -}
 typeE ctx st (Let s e1 e2) = do
   (ctx1, ss1, t1) <- typeE' ctx st e1
@@ -106,8 +111,9 @@ typeE ctx st (AApp v t) = do
     EAll s k cs c -> do
       kt <- kind' ctx t
       kEq ctx kt k
-      ce ctx (subCstrs s t cs)
-      ok ([], st, tNf (subT s t c))
+      ce ctx =<< subCstrs s t cs
+      t <- tNf =<< subT s t c
+      return ([], st, t)
     _ -> raise ("[T-TApp] expected to apply to forall abstraction, got " ++ pretty tv)
 {- T-New -}
 typeE ctx st (New t) = do
@@ -119,15 +125,17 @@ typeE ctx st (Req v) = do
   tv <- typeV' ctx v
   case tv of 
     EAcc t -> do
-      let x = freshVar "c"
+      x <- freshVar "c" 
       ok ([(x, HasKind (KDom SHSingle))], SSMerge st (SSBind (TVar x) t), EChan (TVar x))
     _ -> raise ("[T-Request] expected access point to request to, got " ++ pretty tv)
 {- T-Accept -}
 typeE ctx st (Acc v) = do
   tv <- typeV' ctx v
   case tv of 
-    EAcc t -> let x = freshVar "c" in
-      ok ([(x, HasKind (KDom SHSingle))], SSMerge st (SSBind (TVar x) (tNf (SDual t))), EChan (TVar x))
+    EAcc t -> do
+      x <- freshVar "c"
+      tnf <- tNf (SDual t)
+      ok ([(x, HasKind (KDom SHSingle))], SSMerge st (SSBind (TVar x) tnf), EChan (TVar x))
     _ -> raise ("[T-Accept] expected access point to request to, got " ++ pretty tv)
 {- T-Send -}
 typeE ctx st (Send v1 v2) = do 
@@ -137,13 +145,13 @@ typeE ctx st (Send v1 v2) = do
     EChan d1 -> do
       kd1 <- kind' ctx d1
       kEq ctx kd1 (KDom SHSingle)
-      case stSplitDom ctx st d1 of 
+      stSplitDom ctx st d1 >>= \case 
         Just (r , SSend x kd2 st1 t1 s) -> case kd2 of 
             KDom sh -> do
               ksh <- kind' ctx sh
               kEq ctx ksh KShape
               u <- tUnify ctx [] tv1 t1
-              let st1' = renTM u st1
+              st1' <- renTM u st1
               st' <- stSplitSt ctx r st1'
               ok ([], SSMerge st' (SSBind d1 s), EUnit)
             _ -> raise ("[T-Send] can only abstract over domains, got " ++ pretty kd2)
@@ -154,7 +162,7 @@ typeE ctx st (Send v1 v2) = do
 typeE ctx st (Recv v) = do 
   tv <- typeV' ctx v
   case tv of 
-    EChan d1 -> case stSplitDom ctx st d1 of 
+    EChan d1 -> stSplitDom ctx st d1 >>= \case
         Just (r , SRecv x kd2 st1 t1 s) -> do
           kwf ctx kd2
           kd1 <- kind' ctx d1
@@ -176,7 +184,7 @@ typeE ctx st (Fork v) = do
 typeE ctx st (Close v) = do
   tv <- typeV' ctx v
   case tv of
-    EChan d1 -> case stSplitDom ctx st d1 of 
+    EChan d1 -> stSplitDom ctx st d1 >>= \case
         Just (r , SEnd) -> do
           ok ([], r, EUnit)
         _ -> raise ("[T-Close] expected closable channel (i.e End) along its state binding, got " 
@@ -186,7 +194,7 @@ typeE ctx st (Close v) = do
 typeE ctx st (Sel l v) = do 
   tv <- typeV' ctx v
   case tv of 
-    EChan d1 -> case stSplitDom ctx st d1 of 
+    EChan d1 -> stSplitDom ctx st d1 >>= \case 
         Just (r , SChoice cl cr) -> case l of 
             LLeft -> ok ([], SSMerge r (SSBind d1 cl), EUnit)
             LRight -> ok ([], SSMerge r (SSBind d1 cr), EUnit)
@@ -197,7 +205,7 @@ typeE ctx st (Sel l v) = do
 typeE ctx st (Case v e1 e2) = do 
   tv <- typeV' ctx v
   case tv of 
-    (EChan d1) -> case stSplitDom ctx st d1 of
+    (EChan d1) -> stSplitDom ctx st d1 >>= \case
         Just (r , SBranch s1 s2) -> do    
           tri1 @ (ctxl, stl, tl) <- typeE' ctx (SSMerge r (SSBind d1 s1)) e1
           tri2 @ (ctxr, str, tr) <- typeE' ctx (SSMerge r (SSBind d1 s2)) e2
@@ -207,19 +215,19 @@ typeE ctx st (Case v e1 e2) = do
                     ++ pretty tv ++ " and " ++ pretty st)
     _ -> raise ("[T-Select] expected channel to case split on got " ++ pretty tv)
 
-typeP :: Program -> Result ()
+typeP :: (MonadError String m, MonadState Int m) => Program -> m ()
 typeP (abs, cbs, es) = do
   ctx <- typeCA' [] abs
   (ctx', st') <- typeCC' ctx SSEmpty cbs
   st'' <- typeCE' ctx' st' es
   tEq ctx' st'' SSEmpty 
 
-typeCA' ctx abs = case typeCA ctx abs of
-  Right x -> Right x
-  Left err -> Left $ err ++ "\n\n-----------::        type of         ::-----------\n---- binds ----\n" 
-                         ++ pretty abs ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
+typeCA' :: (MonadError String m, MonadState Int m) => Ctx -> [AccBind] -> m Ctx
+typeCA' ctx abs = catchError (typeCA ctx abs) $ \err -> 
+  raise $ err ++ "\n\n-----------::        type of         ::-----------\n---- binds ----\n" 
+              ++ pretty abs ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]"
 
-typeCA :: Ctx -> [AccBind] -> Result Ctx
+typeCA :: (MonadError String m, MonadState Int m) => Ctx -> [AccBind] -> m Ctx
 typeCA ctx [] = ok ctx
 typeCA ctx ((s, t) : xs) = case t of
     EAcc ty -> do 
@@ -229,25 +237,27 @@ typeCA ctx ((s, t) : xs) = case t of
       typeCA' ctx' xs
     _ -> raise ("[T-NuAccess] expected access point binding, got " ++ pretty t)
 
-typeCC' ctx st cbs = case typeCC ctx st cbs of
-  Right x -> Right x
-  Left err -> Left $ err ++ "\n\n-----------::        type of         ::-----------\n---- binds ----\n" 
-                         ++ pretty cbs ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n" ++ pretty st 
 
-typeCC :: Ctx -> Type -> [ChanBind] -> Result (Ctx, Type) 
+typeCC' :: (MonadError String m, MonadState Int m) => Ctx -> Type -> [ChanBind] -> m (Ctx, Type)
+typeCC' ctx st cbs = catchError (typeCC ctx st cbs) $ \err -> 
+  raise $ err ++ "\n\n-----------::        type of         ::-----------\n---- binds ----\n" 
+              ++ pretty cbs ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n" ++ pretty st
+
+typeCC :: (MonadError String m, MonadState Int m) => Ctx -> Type -> [ChanBind] -> m (Ctx, Type) 
 typeCC ctx st [] = ok (ctx, st)
 typeCC ctx st (((s, s'), t) : xs) = do
   kt <- kind ctx t
   kEq ctx kt KSession
   let ctx' = dce ctx [(s, HasKind (KDom SHSingle)), (s', HasKind (KDom SHSingle))]
-  typeCC' ctx' (SSMerge st (SSMerge (SSBind (TVar s) t) (SSBind (TVar s') (tNf (SDual t))))) xs
+  tnf <- tNf (SDual t)
+  typeCC' ctx' (SSMerge st (SSMerge (SSBind (TVar s) t) (SSBind (TVar s') tnf))) xs
 
-typeCE' ctx st es = case typeCE ctx st es of
-  Right x -> Right x
-  Left err -> Left $ err ++ "\n\n-----------::        type of         ::-----------\n---- exprs ----\n" 
-                         ++ pretty es ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n" ++ pretty st
+typeCE' :: (MonadError String m, MonadState Int m) => Ctx -> Type -> [Expr] -> m Type
+typeCE' ctx st es = catchError (typeCE ctx st es) $ \err -> 
+  raise $ err ++ "\n\n-----------::        type of         ::-----------\n---- exprs ----\n" 
+              ++ pretty es ++ "\n----  ctx  ----\n[" ++ pretty ctx ++ "]\n---- state ----\n" ++ pretty st
 
-typeCE :: Ctx -> Type -> [Expr] -> Result Type
+typeCE :: (MonadError String m, MonadState Int m) =>  Ctx -> Type -> [Expr] -> m Type
 typeCE ctx st [] = ok st
 typeCE ctx st (e : xs) = do
   (_, st', _) <- typeE' ctx st e
