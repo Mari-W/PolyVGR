@@ -119,6 +119,8 @@ kind ctx (EAcc s) = do
 kind ctx EUnit = ok KType
 {- K-Int -}
 kind ctx EInt = ok KType
+{- K-Bool -}
+kind ctx EBool = ok KType
 {- K-Pair -}
 kind ctx (EPair l r) = do
   kl <- kind' ctx l

@@ -1,0 +1,11 @@
+let x = 9 in
+let y = 3 in
+let t = true in
+let f = false in
+let v1 = x + y in 
+let v2 = x - y in
+let v3 = x * y in 
+let v4 = x / y in
+let v5 = t | f in
+let v6 = t & f in
+unit

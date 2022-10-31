@@ -12,8 +12,8 @@ import Ast
       Label(LRight, LLeft),
       Program,
       Type(SDual, EPair, EAll, SSend, SRecv, EArr, SChoice, EUnit, EChan,
-           SBranch, SSEmpty, EAcc, SEnd, SHSingle, SSMerge, SSBind, TVar, EInt),
-      Val(..) )
+           SBranch, SSEmpty, EAcc, SEnd, SHSingle, SSMerge, SSBind, TVar, EInt, EBool),
+      Val(..), BinOp (Add, Sub, Mul, Div, Or, And) )
 import Constraints ( ce )
 import Context ( dce, freshVar, tRes, kExt, csExt, tExt )
 import Conversion ( tNf )
@@ -40,6 +40,8 @@ typeV ctx (VVar x) = tRes ctx x
 typeV ctx VUnit = ok EUnit
 {- T-Nat -}
 typeV ctx (VInt i)  = ok EInt
+{- T-Nat -}
+typeV ctx (VBool b)  = ok EBool
 {- T-Pair -}
 typeV ctx (VPair l r) = do
   tl <- typeV' ctx l
@@ -214,6 +216,21 @@ typeE ctx st (Case v e1 e2) = do
         _ -> raise ("[T-Select] expected branched channel (i.e s & s') along a state including its binding, got " 
                     ++ pretty tv ++ " and " ++ pretty st)
     _ -> raise ("[T-Select] expected channel to case split on got " ++ pretty tv)
+{- T-BinOp -}
+typeE ctx st (BinOp v1 op v2) = do
+  tv1 <- typeV' ctx v1
+  tv2 <- typeV' ctx v2
+  let opt t = (do
+        tEq ctx tv1 t 
+        tEq ctx tv2 t
+        ok ([], st, t))
+  case op of
+    Add -> opt EInt
+    Sub -> opt EInt
+    Mul -> opt EInt
+    Div -> opt EInt
+    And -> opt EBool
+    Or -> opt EBool
 
 typeP :: (MonadError String m, MonadState Int m) => Program -> m ()
 typeP (abs, cbs, es) = do

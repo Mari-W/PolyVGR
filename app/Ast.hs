@@ -24,6 +24,7 @@ data Type
   | EAcc Type
   | EUnit
   | EInt
+  | EBool
   | EPair Type Type
   | SSend String Kind Type Type Type
   | SRecv String Kind Type Type Type
@@ -42,6 +43,15 @@ data Type
   | SSMerge Type Type
   deriving (Show, Eq, Ord)
 
+data BinOp
+  = Add
+  | Sub
+  | Mul
+  | Div
+  | And
+  | Or
+  deriving (Show, Eq, Ord)
+
 data Expr 
   = Let String Expr Expr
   | Val Val
@@ -57,11 +67,13 @@ data Expr
   | Case Val Expr Expr
   | Close Val
   | New Type
+  | BinOp Val BinOp Val
   deriving (Show, Eq, Ord)
 
 data Val 
   = VVar String
   | VInt Integer
+  | VBool Bool 
   | VUnit
   | VPair Val Val
   | VTAbs String Kind [Cstr] Val

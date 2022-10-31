@@ -9,7 +9,7 @@ import Ast
       Type(SSEmpty, SSMerge , TApp, TLam, EAll, EArr, EChan, EAcc, EUnit, EPair,
            SSend, SRecv, SChoice, SBranch, SEnd, SDual, SHEmpty, SHSingle,
            SHMerge, DEmpty, DProj, SSBind, DMerge, TVar, EInt),
-      Val(VPair, VVar, VChan, VAbs, VTAbs, VUnit, VInt) )
+      Val(VPair, VVar, VChan, VAbs, VTAbs, VUnit, VInt, VBool), BinOp (Sub, Add, Mul, Div, And, Or) )
 import Result (Result, ok, raise, ResultT)
 import Text.ParserCombinators.Parsec
     ( alphaNum, letter, parse, many, many1, optional, space, noneOf,
@@ -20,7 +20,6 @@ import Text.Parsec.Language (emptyDef)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Text.Parsec.Combinator (optionMaybe)
 import Control.Monad.Except (MonadError)
-
 
 parseFile :: (MonadError String m, MonadIO m) => String -> m Expr
 parseFile file = do
@@ -43,20 +42,23 @@ langDef = emptyDef {
   Token.commentLine = "//",
   Token.identStart = letter <|> char '_',
   Token.identLetter = alphaNum <|> char '_',
-  Token.reservedOpNames = ["->", "→", "=>", "⇒", 
-                           "λ", "𝜆", "\\", "𝕀", 
-                           "𝕏", "π₁", "π₂", "π", 
-                           "Λ",  "·", "*", "+", 
-                           "⊕", "↦", ";", ":", 
-                           "×", "#", "~", "."],
+  Token.reservedOpNames = ["->", "→", "=>", "⇒",
+                           "λ", "𝜆", "\\", "𝕀",
+                           "𝕏", "π₁", "π₂", "π",
+                           "Λ",  "·", "*", "+",
+                           "⊕", "↦", ";", ":",
+                           "×", "#", "~", ".",
+                           "-", "/", "|", "&"],
   Token.reservedNames  = ["Type", "Session", "State", "Shape",
+                          "Unit", "Bool", "Int",
                           "Dom", "left", "right", "proj1",
-                          "proj2", "all", "forall", 
-                          "ex", "exists", "Chan", "Unit",
-                          "Int", "I", "X", "let", "in", 
-                          "fork", "accept", "request", "send", 
+                          "proj2", "all", "forall",
+                          "ex", "exists", "Chan",
+                          "Int", "I", "X", "let", "in",
+                          "fork", "accept", "request", "send",
                           "on", "receive", "select",  "case",
-                          "of", "close", "new", "chan", "unit"],
+                          "of", "close", "new", "chan",
+                          "unit", "true", "false"],
   Token.caseSensitive = True
 }
 
@@ -76,8 +78,8 @@ commaSep1 = Token.commaSep1 lexer
 commaSep = Token.commaSep lexer
 semiSep1 = Token.semiSep1 lexer
 whiteSpace = Token.whiteSpace lexer
-integer = Token.integer lexer
 symbol = Token.symbol lexer
+natural = Token.natural lexer
 
 {- keywords -}
 
@@ -183,7 +185,7 @@ kBind = do
 
 et1 = eAll <|> et2
 et2 = foldr1 EPair <$> sepBy1 et4 kwTupTimes
-et4 = eChan <|> eUnit <|> eInt <|> eAcc <|> eArr <|> try (parens et1) <|> tApp
+et4 = eChan <|> eUnit <|> eInt <|> eBool <|> eAcc <|> eArr <|> try (parens et1) <|> tApp
 
 eAll = do
   kwForall
@@ -243,6 +245,10 @@ eUnit = do
 
 eInt = do
   reserved "Int"
+  return EInt
+
+eBool = do
+  reserved "Bool"
   return EInt
 
 
@@ -418,7 +424,10 @@ vUnit = do
   reserved "unit"
   return VUnit
 
-vInt =  VInt <$> integer
+vInt =  VInt <$> natural
+
+vTrue =  VBool True <$ reserved "true"
+vFalse =  VBool False <$ reserved "false"
 
 vPair = angles $ do
   v <- val1
@@ -429,6 +438,9 @@ aapp v = do
   t <- brackets (tLam <|> dom1 <|> shape1 <|> session1)
   return $ AApp v t
 
+op = (Add <$ reserved "+") <|> (Sub <$ reserved "-") <|> (Mul <$ reserved "*") <|>
+      (Div <$ reserved "/") <|> (And <$ reserved "&") <|> (Or <$ reserved "|")
+
 expr1 = let1 <|> expr2
 expr2 = expr3 <|> (do
   l <- many1 val1
@@ -437,12 +449,16 @@ expr2 = expr3 <|> (do
     [v] -> do
       mt <- optionMaybe $ brackets (tLam <|> dom1 <|> shape1 <|> session1)
       case mt of
-        Nothing -> return $ Val v
+        Nothing -> do
+          mop <- optionMaybe op
+          case mop of
+            Nothing -> return $ Val v
+            Just op -> BinOp v op <$> val1
         Just t -> return $ AApp v t
     [v1, v2] -> return $ App v1 v2
-    _ -> unexpected "nested applications not allowed in A-normal form")
-expr3 = fork <|> acc <|> req <|> send <|> recv <|> sel 
+    _ -> unexpected "nested applications / binary operations not allowed in A-normal form")
+expr3 = fork <|> acc <|> req <|> send <|> recv <|> sel
         <|> case1 <|> close <|> new <|> proj <|> parens expr1
 
 val1 = vAbs <|> vTAbs <|> val2
-val2 = vChan <|> vUnit <|> vPair <|> parens val1 <|> vInt <|> vVar
+val2 = vChan <|> vUnit <|> vPair <|> vTrue <|> vFalse <|> parens val1 <|> vInt <|> vVar

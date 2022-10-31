@@ -10,7 +10,8 @@ import Ast
       Label(..),
       Program,
       Type(..),
-      Val(..) )
+      Val(..), BinOp (Sub, Add, Mul, Div, And, Or) )
+import Data.Char (toLower)
 
 class Pretty a where
   pp :: Int -> Int -> a -> String
@@ -82,6 +83,7 @@ instance Pretty Type where
   pp i p (EAcc ty) = brace p 100 ("[" ++ pp i 0 ty ++ "]")
   pp i p EUnit = "Unit"
   pp i p EInt = "Int"
+  pp i p EBool = "Bool"
   pp i p (EPair ty ty') = brace p (-1) (pp i 0 ty ++ " × " ++ pp i 0 ty')
   pp i p (SSend s ki st ty ty2) = brace p 100 ("!(∃" ++ s ++ " : " ++ pp i 0 ki ++ ". " ++ pp i 0 st 
                                                           ++ "). " ++ pp i 100 ty2)
@@ -104,10 +106,18 @@ instance Pretty Type where
   pp i p (SSMerge ty SSEmpty) = brace p 3 (pp i 3 ty)
   pp i p (SSMerge ty ty') = brace p 3 (pp i 3 ty ++ " , " ++ pp i 3 ty')
 
+instance Pretty BinOp where
+  pp i p Add = "+"
+  pp i p Sub = "-" 
+  pp i p Mul = "*"
+  pp i p Div = "/"
+  pp i p And = "&"
+  pp i p Or = "|" 
+
 instance Pretty Expr where
   pp i p (Let s ex ex') = brace p 1 ("let " ++ s ++ " = " ++ pp (i + 1) 0 ex ++ " in\n" ++ indent i (pp i 1 ex'))
   pp i p (Val val) = pp i p val
-  pp i p (Proj la val) = brace p 100 ("𝜋" ++ pp i 0 la ++ " " ++ pp i 101 val)
+  pp i p (Proj la val) = brace p 100 ("π" ++ pp i 0 la ++ " " ++ pp i 101 val)
   pp i p (App val val') = brace p 100 (pp i 100 val ++ " " ++ pp i 101 val')
   pp i p (AApp val ty) = brace p 100 (pp i 100 val ++ " [" ++ pp i 0 ty ++ "]")
   pp i p (Fork val) = brace p 100  ("fork " ++ pp i 101 val)
@@ -120,15 +130,17 @@ instance Pretty Expr where
                                                    ++ pp i 0 ex' ++ " }")
   pp i p (Close val) = brace p 100 ("close " ++ pp i 101 val)
   pp i p (New ty) = brace p 100  ("new " ++ pp i 101 ty)
+  pp i p (BinOp l op r) = brace p 100 (pp i 100 l ++ " " ++ pp i 0 op ++ " " ++  pp i 100 r)
 
 instance Pretty Val where
   pp i p (VVar s) = s
   pp i p VUnit = "unit"
   pp i p (VInt j) = show j
+  pp i p (VBool b) = map toLower $ show b
   pp i p (VPair val val') = brace p (-1) (pp i 0 val ++ " , " ++ pp i 0 val')
   pp i p (VTAbs s ki [] val) = brace p 1 ("Λ(" ++ s ++ " : " ++ pp i 0 ki ++ ").\n" ++ indent i (pp i 1 val))
   pp i p (VTAbs s ki xs val) = brace p 1 ("Λ(" ++ s ++ " : " ++ pp i 0 ki ++ "). (" ++ pp i 0 xs 
                                                      ++ ") =>\n" ++ indent i (pp i 1 val))
   pp i p (VChan ty) = brace p 100 ("chan " ++ pp i 101 ty)
   pp i p (VAbs ty s ty' ex) = brace p 1 ("λ(" ++ pp i 0 ty ++ "; " ++ s ++ " : " ++ pp i 0 ty' 
-                                                    ++ ").\n" ++ indent i (pp i 1 ex))
+                                          ++ ").\n" ++ indent i (pp i 1 ex))

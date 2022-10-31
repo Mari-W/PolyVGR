@@ -49,6 +49,7 @@ freeT bs (EChan d) = freeT bs d
 freeT bs (EAcc t) = freeT bs t
 freeT bs EUnit = []
 freeT bs EInt = []
+freeT bs EBool = []
 freeT bs (EPair l r) = freeT bs l ++ freeT bs r
 freeT bs (SSend x k st t c) = let bs' = x : bs in
   freeT bs c ++ freeT bs' t ++ freeT bs' st ++ freeK bs k
@@ -83,6 +84,7 @@ freeE bs (Sel l v) = freeV bs v
 freeE bs (Case v e1 e2) = freeV bs v ++ freeE bs e1 ++ freeE bs e2
 freeE bs (Close v) = freeV bs v
 freeE bs (New t) = []
+freeE bs (BinOp l _ r) = freeV bs l ++ freeV bs r
 
 freeV :: [Bind] -> Val -> [Free]
 freeV bs (VVar x) = case find (== x) bs of
@@ -90,6 +92,7 @@ freeV bs (VVar x) = case find (== x) bs of
   Just _ -> [] 
 freeV bs VUnit = []
 freeV bs (VInt i) = []
+freeV bs (VBool b) = []
 freeV bs (VPair v1 v2) = freeV bs v1 ++ freeV bs v2
 freeV bs (VTAbs x k cs v) = freeV (x : bs) v
 freeV bs (VChan t) = []
@@ -169,6 +172,7 @@ subT x s (EChan d) = EChan <$> subT x s d
 subT x s (EAcc t) = EAcc <$> subT x s t
 subT x s EUnit = return EUnit 
 subT x s EInt = return EInt 
+subT x s EBool = return EBool 
 subT x s (EPair l r) = EPair <$> subT x s l <*> subT x s r
 subT x s (SSend x2 k st t c) =  if x == x2 then SSend x2 <$> subK x s k <*> pure st <*> pure t  <*> subT x s c else 
     case find (== x2) (freeT [] s) of
@@ -215,12 +219,14 @@ subE x s (Recv v) = Recv <$> subV x s v
 subE x s (Sel l v) = Sel l <$> subV x s v
 subE x s (Case v e1 e2) =  Case <$> subV x s v <*> subE x s e1 <*> subE x s e2
 subE x s (Close v) = Close <$> subV x s v
-subE x s (New t) = return $ New t 
+subE x s (New t) = return $ New t
+subE x s (BinOp l op r) = BinOp <$> subV x s l <*> pure op <*> subV x s r 
 
 subV :: MonadState Int m => String -> Val -> Val -> m Val
 subV x s (VVar x2) = return $ if x == x2 then s else VVar x2
 subV x s VUnit = return VUnit
 subV x s (VInt i) = return $ VInt i
+subV x s (VBool b) = return $ VBool b
 subV x s (VPair v1 v2) = VPair <$> subV x s v1 <*> subV x s v2
 subV x s (VTAbs x2 k cs v) = VTAbs x2 k cs <$> subV x s v
 subV x s (VChan t) = return $ VChan t
@@ -246,11 +252,13 @@ subTE x s (Sel l v) = Sel l <$> subTV x s v
 subTE x s (Case v e1 e2) =  Case <$> subTV x s v <*> subTE x s e1 <*> subTE x s e2
 subTE x s (Close v) = Close <$> subTV x s v
 subTE x s (New t) = New <$> subT x s t
+subTE x s (BinOp l op r) = BinOp <$> subTV x s l <*> pure op <*> subTV x s r
 
 subTV :: MonadState Int m => String -> Type -> Val -> m Val
 subTV x s (VVar x2) = return $ VVar x2
 subTV x s VUnit = return VUnit
 subTV x s (VInt i) = return $ VInt i
+subTV x s (VBool b) = return $ VBool b
 subTV x s (VPair v1 v2) = VPair <$> subTV x s v1 <*> subTV x s v2
 subTV x s (VTAbs x2 k cs v) = if x == x2 then VTAbs x2 <$> subK x s k <*> pure cs <*> pure v else 
     case find (== x2) (freeT [] s) of

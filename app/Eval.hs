@@ -9,7 +9,7 @@ import Ast
       Label(LRight, LLeft),
       Program,
       Type(TVar, EAcc, SSend, SChoice, SEnd, SRecv, SBranch),
-      Val(..) )
+      Val(..), BinOp (Add, Sub, Mul, Div, And, Or) )
 import Substitution ( subE, subTV )
 import Data.Foldable ()
 import Typing ( typeP )
@@ -69,6 +69,12 @@ evalE' (Let x e1 e2) = Let x <$> evalE' e1 <*> pure e2
 evalE' (Proj l (VPair v1 v2)) = case l of   
   LLeft -> return $ Val v1
   LRight -> return $ Val v2
+evalE' (BinOp (VInt i) Add (VInt j)) = return $ Val $ VInt $ i + j
+evalE' (BinOp (VInt i) Sub (VInt j)) = return $ Val $ VInt $ i - j
+evalE' (BinOp (VInt i) Mul (VInt j)) = return $ Val $ VInt $ i * j
+evalE' (BinOp (VInt i) Div (VInt j)) = return $ Val $ VInt $ i `div` j
+evalE' (BinOp (VBool l) And (VBool r)) = return $ Val $ VBool $ l && r
+evalE' (BinOp (VBool l) Or (VBool r)) = return $ Val $ VBool $ l || r
 evalE' e = return e
 
 fixEvalEs :: (MonadState Int m) => [Expr] -> m [Expr]

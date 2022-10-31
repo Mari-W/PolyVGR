@@ -7,7 +7,7 @@ import Ast
       Kind(..),
       Type(SSMerge, TVar, TApp, TLam, EArr, EAll, EChan, EAcc, EUnit,
            SSend, SRecv, SChoice, SBranch, SEnd, SDual, SHEmpty, SHSingle,
-           SHMerge, DEmpty, DMerge, DProj, SSEmpty, SSBind, EInt) )
+           SHMerge, DEmpty, DMerge, DProj, SSEmpty, SSBind, EInt, EBool) )
 import Data.Bifunctor (Bifunctor (bimap))
 import Result ( ok, raise, unreachable, Result )
 import Data.Foldable ( find )
@@ -108,6 +108,7 @@ tUnify ctx eqs (EChan t) (EChan t') = tUnify ctx eqs t t'
 tUnify ctx eqs (EAcc t) (EAcc t') = tUnify ctx eqs t t'
 tUnify ctx eqs EUnit EUnit = ok []
 tUnify ctx eqs EInt EInt = ok []
+tUnify ctx eqs EBool EBool = ok []
 tUnify ctx eqs (SSend n k s t c) (SSend n' k' s' t' c') = do
   kEq ctx k k'
   s <- tUnify ctx ((n, n') : eqs) s s'
